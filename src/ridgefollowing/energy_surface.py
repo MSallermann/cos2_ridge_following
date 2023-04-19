@@ -43,8 +43,8 @@ class EnergySurface(abc.ABC):
         Returns:
             npt.NDArray: dot product of gradient and direction
         """
-        # Fallback uses FD
-        return self.fd_directional_gradient(x, dir)
+        dir_n = dir / np.linalg.norm(dir)
+        return np.dot(self.gradient(x), dir_n)
 
     def curvature(self, x: npt.ArrayLike, dir: npt.ArrayLike) -> npt.NDArray:
         """The curvature at point x in direction dir
@@ -82,21 +82,6 @@ class EnergySurface(abc.ABC):
         # Fallback uses FD
         return nd.Gradient(self.energy)(x)
 
-    def fd_directional_gradient(
-        self, x: npt.ArrayLike, dir: npt.ArrayLike
-    ) -> npt.NDArray:
-        """Directional derivative, computed with finite differences
-
-        Args:
-            x (npt.ArrayLike): the point on the energy surface
-            dir (npt.ArrayLike): the direction
-
-        Returns:
-            npt.NDArray: dot product of gradient and direction
-        """
-        dir_n = dir / np.linalg.norm(dir)
-        return np.dot(self.gradient(x), dir_n)
-
     def fd_curvature(self, x: npt.ArrayLike, dir: npt.ArrayLike) -> npt.NDArray:
         """The curvature at point x in direction dir, computed with finite differences
 
@@ -107,7 +92,6 @@ class EnergySurface(abc.ABC):
         Returns:
             np.ArrayLike: the curvature, equivalent to Hessian * dir
         """
-
         return nd.Gradient(self.directional_gradient)(x, dir)
 
     def fd_hessian(self, x: npt.ArrayLike) -> npt.NDArray:
