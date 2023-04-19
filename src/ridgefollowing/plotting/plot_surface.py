@@ -13,7 +13,7 @@ class PlotSettings(BaseModel):
     lims: npt.ArrayLike = np.array([[0, 1], [0, 1]])
     width: float = 9 * Paper_Plot.cm
     outfile: Optional[str] = None
-    npoints: npt.ArrayLike = np.array([256, 256], dtype=np.int64)
+    npoints: npt.ArrayLike = np.array([100, 100], dtype=np.int64)
     abs_horizontal_margins: npt.NDArray = np.array(
         [1.25 * Paper_Plot.cm, 0.25 * Paper_Plot.cm]
     )
@@ -22,10 +22,12 @@ class PlotSettings(BaseModel):
     )
     vmax: Optional[float]
     vmin: Optional[float]
-    contourlevels: float = 50
+    contourlevels: float = 20
     colormap = "plasma"
+    plot_c2 : bool = False
     dpi: float = 300
-
+    plot_gradient : bool = False
+    plot_mode : bool = False
 
 def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()):
     if ax is None:
@@ -43,29 +45,59 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
 
     X = np.linspace(settings.lims[0, 0], settings.lims[0, 1], settings.npoints[0])
     Y = np.linspace(settings.lims[1, 0], settings.lims[1, 1], settings.npoints[1])
-    Z = np.zeros(shape=settings.npoints)
+    energy = np.empty(shape=settings.npoints)
+    c2 = np.empty(shape=settings.npoints)
+    mode = np.empty(shape=(*settings.npoints, surface.ndim))
+    gradient = np.empty(shape=(*settings.npoints, surface.ndim))
 
     for xi, x in enumerate(X):
         for yi, y in enumerate(Y):
-            Z[yi, xi] = surface.energy([x, y])
+            energy[yi, xi] = surface.energy([x, y])
 
-    Zmin = np.min(Z)
-    Zmax = np.max(Z)
+            evals, evecs = np.linalg.eig( surface.hessian([x,y]) )
+            eval_order = np.argsort(evals)
+            mode[yi, xi] = evecs[eval_order[0]]
 
-    Z = 0.001 + (Z - Zmin) / (Zmax - Zmin)
-    Z = np.log(Z)
+            gradient[yi, xi] = surface.gradient([x,y])
+            gradient[yi, xi] = gradient[yi, xi] / np.linalg.norm(gradient[yi, xi])
 
-    contours = ax.contourf(
+            c2[yi, xi] = np.dot(mode[yi,xi], gradient[yi, xi])**2
+
+    energymin = np.min(energy)
+    energymax = np.max(energy)
+
+    energy = 0.001 + (energy - energymin) / (energymax - energymin)
+    energy = np.log(energy)
+
+    if settings.plot_c2:
+        contours = ax.contourf(
+            X,
+            Y,
+            c2,
+            extend="neither",
+            levels=settings.contourlevels,
+            vmin=settings.vmin,
+            vmax=settings.vmax,
+            cmap=settings.colormap,
+        )
+
+    contours = ax.contour(
         X,
         Y,
-        Z,
+        energy,
         extend="neither",
         levels=settings.contourlevels,
         vmin=settings.vmin,
         vmax=settings.vmax,
-        cmap=settings.colormap,
+        colors="white",
     )
-    fig.colorbar(contours)
+
+    if settings.plot_mode:
+        ax.streamplot(X, Y, mode[:,:,0], mode[:,:,1])
+
+    if settings.plot_mode:
+        ax.streamplot(X, Y, gradient[:,:,0], gradient[:,:,1])
+
     ax.set_xlabel("x")
     ax.set_ylabel("y")
 
