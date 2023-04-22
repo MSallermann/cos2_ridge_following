@@ -9,7 +9,6 @@ class LepsSurface(energy_surface.EnergySurface):
     def __init__(
         self,
     ):
-        print(super())
         super().__init__(ndim=2)
         self.a = 0.05
         self.b = 0.80

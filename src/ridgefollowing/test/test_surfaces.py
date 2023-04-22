@@ -1,5 +1,12 @@
 import ridgefollowing
-from ridgefollowing.surfaces import muller_brown, gaussians, peaks
+from ridgefollowing.surfaces import (
+    muller_brown,
+    gaussians,
+    peaks,
+    leps,
+    lepsho,
+    lepshogauss,
+)
 import numpy as np
 import pytest
 
@@ -10,13 +17,18 @@ def test_against_fd():
     """Test the implementation of gradient and hessian functions against finite differences"""
 
     # Two dimensional test points
-    test_points_2d = np.array([[-1.0, 0.5], [-2, 2], [-1, 4], [0, 0], [-4, 5]])
+    test_points_2d = np.array([[-1.0, 0.5], [-2, 2], [-1, 4], [0, 0], [-3, 2]])
 
     # 1. The Muller brown surface
     esurf_mb = muller_brown.MullerBrownSurface()
 
     # 2. Peaks surface
     esurf_peaks = peaks.PeaksSurface()
+
+    # 3. Leps surfaces
+    esurf_leps = leps.LepsSurface()
+    esurf_lepsho = lepsho.LepsHOSurface()
+    esurf_lepshogauss = lepshogauss.LepsHOGaussSurface()
 
     # 2. A more general gaussian surface
     ndim = 12
@@ -51,9 +63,15 @@ def test_against_fd():
     for esurf, test_points in [
         [esurf_mb, test_points_2d],
         [esurf_peaks, test_points_2d],
+        [esurf_leps, test_points_2d],
+        [esurf_lepsho, test_points_2d],
+        [esurf_lepshogauss, test_points_2d],
         [esurf_gauss, test_points_gauss],
     ]:
         for x in test_points:
+            print(esurf)
+            print(x)
+
             energy = esurf.energy(x)  # Can't really test, should at leat not throw
 
             # Compare gradient to FD
