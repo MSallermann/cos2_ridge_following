@@ -1,5 +1,5 @@
 import ridgefollowing
-from ridgefollowing.surfaces import muller_brown, gaussians
+from ridgefollowing.surfaces import muller_brown, gaussians, peaks
 import numpy as np
 import pytest
 
@@ -9,9 +9,14 @@ epsilon = 1e6
 def test_against_fd():
     """Test the implementation of gradient and hessian functions against finite differences"""
 
+    # Two dimensional test points
+    test_points_2d = np.array([[-1.0, 0.5], [-2, 2], [-1, 4], [0, 0], [-4, 5]])
+
     # 1. The Muller brown surface
     esurf_mb = muller_brown.MullerBrownSurface()
-    test_points_mb = np.array([[-1.0, 0.5], [-2, 2], [-1, 4], [0, 0], [-4, 5]])
+
+    # 2. Peaks surface
+    esurf_peaks = peaks.PeaksSurface()
 
     # 2. A more general gaussian surface
     ndim = 12
@@ -44,7 +49,8 @@ def test_against_fd():
 
     # Perform the tests
     for esurf, test_points in [
-        [esurf_mb, test_points_mb],
+        [esurf_mb, test_points_2d],
+        [esurf_peaks, test_points_2d],
         [esurf_gauss, test_points_gauss],
     ]:
         for x in test_points:

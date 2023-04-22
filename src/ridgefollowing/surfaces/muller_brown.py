@@ -3,8 +3,6 @@ import numpy as np
 
 
 class MullerBrownSurface(gaussians.GaussianSurface):
-    ndim = 2
-
     def __init__(self):
         magnitudes = np.array([-200.0, -100.0, -170.0, 15.0], dtype=np.float64)
         centers = np.array(

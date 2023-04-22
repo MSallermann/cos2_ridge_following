@@ -4,6 +4,10 @@ import numpy.typing as npt
 
 
 class GaussianSurface(energy_surface.EnergySurface):
+    """Implements energy terms of the form
+    E_gauss(r) = magnitude * exp( 0.5 / width**2  * (r-center)^T M (r-center) )
+    """
+
     def __init__(
         self,
         magnitudes: npt.ArrayLike,

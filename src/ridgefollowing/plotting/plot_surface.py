@@ -17,7 +17,9 @@ class ScalarPlotSettings(BaseModel):
     contours: bool = False
     contours_filled: bool = True
 
-    colormap: Optional[str] = "plasma"
+    log_compression: bool = True
+
+    colormap: Optional[str] = "seismic"
     color: Optional[str] = None
     contourlevels: int = 20
     vmax: Optional[float] = None
@@ -32,6 +34,12 @@ class ScalarPlotSettings(BaseModel):
 
         return_vals = []
         for f in plot_funcs:
+            if self.log_compression:
+                Zmin = np.min(Z)
+                Zmax = np.max(Z)
+                Z = 0.001 + (Z - Zmin) / (Zmax - Zmin)
+                Z = np.log(Z)
+
             return_vals.append(
                 f(
                     X,
@@ -180,12 +188,6 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         np.save(settings.output_data_folder / "gradient", gradient)
         np.save(settings.output_data_folder / "c2", c2)
         np.save(settings.output_data_folder / "gradient_c", gradient_c)
-
-    energymin = np.min(energy)
-    energymax = np.max(energy)
-
-    energy = 0.001 + (energy - energymin) / (energymax - energymin)
-    energy = np.log(energy)
 
     if settings.plot_c2:
         settings.plot_c2.plot(ax, X, Y, c2)
