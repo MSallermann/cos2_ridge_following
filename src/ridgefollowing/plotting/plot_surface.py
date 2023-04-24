@@ -6,6 +6,7 @@ from spirit_extras.plotting import Paper_Plot
 from typing import Optional
 from pydantic import BaseModel
 from pathlib import Path
+from dataclasses import dataclass
 import numpy.typing as npt
 import numpy as np
 
@@ -20,7 +21,8 @@ class ScalarPlotSettings(BaseModel):
     log_compression: bool = True
 
     colormap: Optional[str] = "seismic"
-    color: Optional[str] = None
+    linestyles: Optional[str] = "solid"
+    colors: Optional[str] = None
     contourlevels: int = 20
     vmax: Optional[float] = None
     vmin: Optional[float] = None
@@ -50,6 +52,8 @@ class ScalarPlotSettings(BaseModel):
                     vmin=self.vmin,
                     vmax=self.vmax,
                     cmap=self.colormap,
+                    colors=self.colors,
+                    linestyles=self.linestyles,
                 )
             )
         return return_vals
@@ -111,6 +115,7 @@ class PlotSettings(BaseModel):
 
     plot_energy: Optional[ScalarPlotSettings] = None
     plot_c2: Optional[ScalarPlotSettings] = None
+    plot_evaldiff: Optional[ScalarPlotSettings] = None
 
     plot_gradient: Optional[VectorPlotSettings] = None
     plot_mode: Optional[VectorPlotSettings] = None
@@ -118,6 +123,14 @@ class PlotSettings(BaseModel):
 
 
 def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()):
+    @dataclass
+    class Return_Value:
+        pplot = None
+        ax = None
+
+    return_value = Return_Value()
+    return_value.ax = ax
+
     if ax is None:
         pplot = Paper_Plot(width=settings.width)
         pplot.apply_absolute_margins(
@@ -128,6 +141,8 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         fig = pplot.fig()
         gs = pplot.gs()
         ax = fig.add_subplot(gs[0])
+        return_value.ax = ax
+        return_value.pplot = pplot
 
     assert surface.ndim == 2
 
@@ -139,6 +154,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         mode = np.empty(shape=(*settings.npoints, surface.ndim))
         gradient = np.empty(shape=(*settings.npoints, surface.ndim))
         gradient_c = np.empty(shape=(*settings.npoints, surface.ndim))
+        eigenvalues = np.empty(shape=(*settings.npoints, surface.ndim))
 
         Rfollower = ridgefollower.RidgeFollower(surface)
 
@@ -154,8 +170,12 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
 
                 energy[yi, xi] = surface.energy([x, y])
 
-                if settings.plot_mode:
-                    mode[yi, xi] = modes.lowest_mode(surface.hessian([x, y]))[1]
+                if settings.plot_mode or settings.plot_evaldiff:
+                    hessian = surface.hessian([x, y])
+                    eigenvals, eigenvecs = modes.eigenpairs(hessian)
+
+                    mode[yi, xi] = eigenvecs[0]
+                    eigenvalues[yi, xi] = eigenvals
 
                 if settings.plot_gradient:
                     gradient[yi, xi] = surface.gradient([x, y])
@@ -179,6 +199,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         mode = np.load(settings.input_data_folder / "mode.npy")
         gradient = np.load(settings.input_data_folder / "gradient.npy")
         gradient_c = np.load(settings.input_data_folder / "gradient_c.npy")
+        eigenvalues = np.load(settings.input_data_folder / "eigenvalues.npy")
 
     if not settings.output_data_folder is None:
         np.save(settings.output_data_folder / "X", X)
@@ -188,12 +209,18 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         np.save(settings.output_data_folder / "gradient", gradient)
         np.save(settings.output_data_folder / "c2", c2)
         np.save(settings.output_data_folder / "gradient_c", gradient_c)
+        np.save(settings.output_data_folder / "eigenvalues", eigenvalues)
 
     if settings.plot_c2:
         settings.plot_c2.plot(ax, X, Y, c2)
 
     if settings.plot_energy:
         settings.plot_energy.plot(ax, X, Y, energy)
+
+    if settings.plot_evaldiff:
+        settings.plot_evaldiff.plot(
+            ax, X, Y, eigenvalues[:, :, 1] - eigenvalues[:, :, 0]
+        )
 
     if settings.plot_mode:
         settings.plot_mode.plot(ax, X, Y, mode[:, :, 0], mode[:, :, 1])
@@ -211,3 +238,5 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
 
     if not settings.outfile is None:
         fig.savefig(settings.outfile, dpi=settings.dpi)
+
+    return return_value
