@@ -12,8 +12,7 @@ def lowest_mode(matrix: npt.ArrayLike) -> npt.NDArray:
         float, npt.NDArray: Tupel of lowest (eval, evec)
     """
     evals, evecs = np.linalg.eigh(matrix)
-    eval_order = np.argsort(evals)
-    return evals[eval_order[0]], evecs[eval_order[0]]
+    return evals[0], evecs[:, 0]
 
 
 def eigenpairs(matrix: npt.ArrayLike) -> npt.NDArray:
@@ -26,5 +25,4 @@ def eigenpairs(matrix: npt.ArrayLike) -> npt.NDArray:
         float, npt.NDArray: Tupel of lowest (eval, evec)
     """
     evals, evecs = np.linalg.eigh(matrix)
-    eval_order = np.argsort(evals)
-    return evals[eval_order], evecs[eval_order]
+    return evals, evecs
