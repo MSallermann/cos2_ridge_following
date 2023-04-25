@@ -3,12 +3,25 @@ from ridgefollowing.algorithms import modes, ridgefollower
 
 # from ridgefollowing import ridgefollower
 from spirit_extras.plotting import Paper_Plot
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
 from pathlib import Path
 from dataclasses import dataclass
 import numpy.typing as npt
 import numpy as np
+import matplotlib.pyplot as plt
+
+
+class PathPlotSettings(BaseModel):
+    class Config:
+        arbitrary_types_allowed = True
+
+    points: npt.NDArray
+    ls: str = "-"
+    color: str = "black"
+
+    def plot(self, ax):
+        ax.plot(self.points[:, 0], self.points[:, 1], ls=self.ls, color=self.color)
 
 
 class ScalarPlotSettings(BaseModel):
@@ -113,13 +126,21 @@ class PlotSettings(BaseModel):
         [100, 100], dtype=np.int64
     )  # number of sample points [npointsx, npointsy]
 
+    xlim: Optional[npt.NDArray] = None
+    ylim: Optional[npt.NDArray] = None
+
+    path_plots: List[PathPlotSettings] = []
+
     plot_energy: Optional[ScalarPlotSettings] = None
     plot_c2: Optional[ScalarPlotSettings] = None
     plot_evaldiff: Optional[ScalarPlotSettings] = None
+    plot_c_grad_norm: Optional[ScalarPlotSettings] = None
 
     plot_gradient: Optional[VectorPlotSettings] = None
     plot_mode: Optional[VectorPlotSettings] = None
     plot_gradient_c: Optional[VectorPlotSettings] = None
+
+    show: bool = False
 
 
 def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()):
@@ -186,7 +207,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                 if settings.plot_c2:
                     c2[yi, xi] = Rfollower.C([x, y]) ** 2
 
-                if settings.plot_gradient_c:
+                if settings.plot_gradient_c or settings.plot_c_grad_norm:
                     gradient_c[yi, xi] = Rfollower.fd_grad_C([x, y])
     else:
         assert (
@@ -222,6 +243,9 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
             ax, X, Y, eigenvalues[:, :, 1] - eigenvalues[:, :, 0]
         )
 
+    if settings.plot_c_grad_norm:
+        settings.plot_c_grad_norm.plot(ax, X, Y, np.linalg.norm(gradient_c, axis=2))
+
     if settings.plot_mode:
         settings.plot_mode.plot(ax, X, Y, mode[:, :, 0], mode[:, :, 1])
 
@@ -233,10 +257,22 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
             ax, X, Y, gradient_c[:, :, 0], gradient_c[:, :, 1]
         )
 
+    for path_settings in settings.path_plots:
+        path_settings.plot(ax)
+
+    if not settings.xlim is None:
+        ax.set_xlim(settings.xlim)
+
+    if not settings.ylim is None:
+        ax.set_ylim(settings.ylim)
+
     ax.set_xlabel("x")
     ax.set_ylabel("y")
 
     if not settings.outfile is None:
         fig.savefig(settings.outfile, dpi=settings.dpi)
+
+    if settings.show:
+        plt.show()
 
     return return_value
