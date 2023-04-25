@@ -5,7 +5,8 @@ from numdifftools import Gradient
 
 def test_spherical_optimizer():
     ndim = 12
-    coeffs = np.linspace(10.0, 2.0, ndim)
+    coeffs = np.linspace(2.0, 10.0, ndim)
+    coeffs[5] = 1.0
 
     def fun(x):
         return np.dot(coeffs, x**2)
@@ -14,6 +15,7 @@ def test_spherical_optimizer():
         return 2.0 * coeffs * x
 
     soptimizer = spherical_optimizer.SphericalOptimization(fun, jac, ndim=ndim)
+    soptimizer.disp = True
 
     for i in range(10):
         # x_initial = np.array(np.random.random(ndim))
@@ -42,9 +44,9 @@ def test_spherical_optimizer():
 
     x_opt = soptimizer.minimize(x_initial)
     x_opt_expected = np.zeros(ndim)
-    x_opt_expected[0] = 1.0
+    x_opt_expected[5] = 1.0
 
-    # assert np.allclose(x_opt, x_opt_expected, atol=1e-6)
+    assert np.allclose(x_opt, x_opt_expected, atol=1e-5)
 
 
 test_spherical_optimizer()
