@@ -12,17 +12,23 @@ class RidgeFollower:
         self,
         energy_surface: energy_surface.EnergySurface,
         maxiter: int = 1000,
-        tolerance: Optional[float] = None,
-        n_iterations_folow: int = 100,
+        tolerance: Optional[float] = 1e-4,
+        n_iterations_follow: int = 100,
         radius: float = 0.5e-2,
     ) -> None:
         self.esurf: energy_surface.EnergySurface = energy_surface
         self.tolerance: float = tolerance
         self.maxiter: int = maxiter
         self.radius: float = radius
-        self.n_iterations_follow: int = n_iterations_folow
+        self.n_iterations_follow: int = n_iterations_follow
 
-        self.history: List[npt.NDArray] = []
+        self.history: dict = dict(
+            x_cur=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
+            d_cur=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
+            E=np.zeros(shape=(self.n_iterations_follow)),
+            c2=np.zeros(shape=(self.n_iterations_follow)),
+            grad_c2=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
+        )
 
     def C(self, x: npt.ArrayLike) -> float:
         """Computes the cos function
@@ -60,7 +66,9 @@ class RidgeFollower:
         """
         return self.fd_grad_C(x)
 
-    def find_maximum_on_ring(self, x0: npt.NDArray, d0: npt.NDArray):
+    def find_maximum_on_ring(
+        self, x0: npt.NDArray, d0: npt.NDArray
+    ) -> List[npt.NDArray]:
         """Finds the maximum value of C2 on a ring with radius around x0. d0 is the initial guess for the direction of the maximum
 
         Args:
@@ -110,4 +118,9 @@ class RidgeFollower:
             x_cur += self.radius * d_cur
 
             E = self.esurf.energy(x_cur)
-            self.history.append(np.array([*x_cur, *d_cur, c2, *grad_c2, E]))
+
+            self.history["x_cur"][i] = np.array(x_cur)
+            self.history["d_cur"][i] = np.array(d_cur)
+            self.history["c2"][i] = c2
+            self.history["grad_c2"][i] = grad_c2
+            self.history["E"][i] = E
