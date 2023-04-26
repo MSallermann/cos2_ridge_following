@@ -7,17 +7,21 @@ class LepsHOGaussSurface(lepsho.LepsHOSurface):
     def __init__(self):
         super().__init__()
 
-        magnitudes = np.array([1.5])
-        centers = np.array([[2.02083, -0.272881]])
+        magnitudes = np.array([1.5, 7.0])
+        centers = np.array([[2.02083, -0.172881], [0.8, 2.0]])
         matrices = np.array(
             [
                 [
                     [-1 / 0.1**2, 0],
                     [0, -1 / 0.35**2],
-                ]
+                ],
+                [
+                    [-1 / 0.447213**2, 0],
+                    [0, -1 / 1.195229**2],
+                ],
             ]
         )
-        widths = np.array([1])
+        widths = np.array([1.0, 1.0])
 
         # Multiple inheritance sucks in python, so we use composition instead
         self.gaussian_surface = gaussians.GaussianSurface(
