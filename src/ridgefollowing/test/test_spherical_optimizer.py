@@ -15,7 +15,6 @@ def test_spherical_optimizer():
         return 2.0 * coeffs * x
 
     soptimizer = spherical_optimizer.SphericalOptimization(fun, jac, ndim=ndim)
-    soptimizer.disp = True
 
     for i in range(10):
         # x_initial = np.array(np.random.random(ndim))
