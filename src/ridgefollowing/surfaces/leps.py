@@ -90,7 +90,7 @@ class LepsSurface(energy_surface.EnergySurface):
             np.dot(self.J_vec, np.matmul(self.J_matrix, self.J_vec))
         )
 
-        return J_contribution + Q_contribution
+        return Q_contribution - J_contribution
 
     def energy(self, x: npt.ArrayLike) -> float:
         """LEPS with fixed value of rAC"""
