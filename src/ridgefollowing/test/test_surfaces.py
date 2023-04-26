@@ -6,6 +6,7 @@ from ridgefollowing.surfaces import (
     leps,
     lepsho,
     lepshogauss,
+    quadratic,
 )
 import numpy as np
 import pytest
@@ -29,6 +30,9 @@ def test_against_fd():
     esurf_leps = leps.LepsSurface()
     esurf_lepsho = lepsho.LepsHOSurface()
     esurf_lepshogauss = lepshogauss.LepsHOGaussSurface()
+
+    # 4. Quadratic surface
+    esurf_quadratic = quadratic.QuadraticSurface(hessian=np.diag([2, 4]))
 
     # 2. A more general gaussian surface
     ndim = 12
@@ -66,6 +70,7 @@ def test_against_fd():
         [esurf_leps, test_points_2d],
         [esurf_lepsho, test_points_2d],
         [esurf_lepshogauss, test_points_2d],
+        [esurf_quadratic, test_points_2d],
         [esurf_gauss, test_points_gauss],
     ]:
         for x in test_points:
