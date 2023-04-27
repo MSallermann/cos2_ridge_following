@@ -41,3 +41,8 @@ class LepsHOGaussSurface(lepsho.LepsHOSurface):
         grad = super().gradient(x)
         grad += self.gaussian_surface.gradient(x)
         return grad
+
+    def hessian(self, x: npt.ArrayLike) -> npt.NDArray:
+        hessian = super().hessian(x)
+        hessian += self.gaussian_surface.hessian(x)
+        return hessian
