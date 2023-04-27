@@ -26,6 +26,7 @@ class LepsSurface(energy_surface.EnergySurface):
         )
 
         self.J_vec = np.zeros(3)
+        self.diff_J_vec = np.zeros(3)
 
     def Q(self, r: float, d: float):
         """Q helper function
@@ -97,3 +98,85 @@ class LepsSurface(energy_surface.EnergySurface):
         rAB = x[0]
         rBC = x[1]
         return self.V_LEPS(rAB, rBC, self.rAC)
+
+    def diff_Q(self, r: float, d: float):
+        """derivative of Q helper function wrt r
+
+        Args:
+            r (_type_): _description_
+            d (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        return (
+            0.5
+            * d
+            * (
+                -3.0 * self.alpha * np.exp(-2.0 * self.alpha * (r - self.r0))
+                + self.alpha * np.exp(-self.alpha * (r - self.r0))
+            )
+        )
+
+    def diff_J(self, r: float, d: float):
+        """derivative of J helper function wrt r
+
+        Args:
+            r (_type_): _description_
+            d (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        return (
+            0.25
+            * d
+            * (
+                -2.0 * self.alpha * np.exp(-2.0 * self.alpha * (r - self.r0))
+                + 6.0 * self.alpha * np.exp(-self.alpha * (r - self.r0))
+            )
+        )
+
+    def gradient_V_LEPS(self, rAB, rBC, rAC):
+        """Grad of the leps potential function
+
+        Args:
+            rAB (_type_): _description_
+            rBC (_type_): _description_
+            rAC (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
+        grad = np.zeros(3)
+        grad[0] = self.diff_Q(rAB, self.dAB) / (1.0 + self.a)
+        grad[1] = self.diff_Q(rBC, self.dBC) / (1.0 + self.b)
+        grad[2] = self.diff_Q(rAC, self.dAC) / (1.0 + self.c)
+
+        self.J_vec[0] = self.J(rAB, self.dAB) / (1.0 + self.a)
+        self.J_vec[1] = self.J(rBC, self.dBC) / (1.0 + self.b)
+        self.J_vec[2] = self.J(rAC, self.dAC) / (1.0 + self.c)
+
+        self.diff_J_vec[0] = self.diff_J(rAB, self.dAB) / (1.0 + self.a)
+        self.diff_J_vec[1] = self.diff_J(rBC, self.dBC) / (1.0 + self.b)
+        self.diff_J_vec[2] = self.diff_J(rAC, self.dAC) / (1.0 + self.c)
+
+        J_contribution = np.sqrt(np.dot(self.J_vec, self.J_matrix @ self.J_vec))
+
+        J_grad = 1.0 / J_contribution * self.J_matrix @ self.J_vec * self.diff_J_vec
+
+        grad -= J_grad
+        return grad
+
+    def gradient(self, x: npt.ArrayLike) -> npt.NDArray:
+        """Gradient of LEPS potential
+
+        Args:
+            x (npt.ArrayLike): point in configuration space
+
+        Returns:
+            npt.NDArray: the gradient
+        """
+        rAB = x[0]
+        rBC = x[1]
+        return self.gradient_V_LEPS(rAB, rBC, self.rAC)[:2]

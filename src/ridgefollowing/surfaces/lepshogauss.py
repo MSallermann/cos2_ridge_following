@@ -36,3 +36,8 @@ class LepsHOGaussSurface(lepsho.LepsHOSurface):
         energy = super().energy(x)
         energy += self.gaussian_surface.energy(x)
         return energy
+
+    def gradient(self, x: npt.ArrayLike) -> npt.NDArray:
+        grad = super().gradient(x)
+        grad += self.gaussian_surface.gradient(x)
+        return grad
