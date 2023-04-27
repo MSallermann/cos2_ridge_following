@@ -18,7 +18,9 @@ def test_against_fd():
     """Test the implementation of gradient and hessian functions against finite differences"""
 
     # Two dimensional test points
-    test_points_2d = np.array([[-1.0, 0.5], [-2, 2], [-1, 4], [0, 0], [-3, 2]])
+    test_points_2d = np.array(
+        [[-1.0, 0.5], [2, 2], [-1, 4], [0, 0], [-1, 2], [-1.0, 4.742]]
+    )
 
     # 1. The Muller brown surface
     esurf_mb = muller_brown.MullerBrownSurface()
@@ -75,18 +77,25 @@ def test_against_fd():
     ]:
         for x in test_points:
             print(esurf)
-            print(x)
+            print(f"x = {x}")
 
             energy = esurf.energy(x)  # Can't really test, should at leat not throw
+            print(f"energy = {energy}")
 
             # Compare gradient to FD
             grad_fd = esurf.fd_gradient(x)
             grad = esurf.gradient(x)
+            print(f"grad_fd = {grad_fd}")
+            print(f"grad = {grad}")
+
             assert np.allclose(grad, grad_fd)
 
             # Compare hessian to FD
             hessian_fd = esurf.fd_hessian(x)
             hessian = esurf.hessian(x)
+
+            print("hessian_fd\n", hessian_fd)
+            print("hessian\n", hessian)
             assert np.allclose(hessian_fd, hessian)
 
             # Curvature, just take the first test point as direction
