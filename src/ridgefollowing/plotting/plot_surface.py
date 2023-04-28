@@ -19,9 +19,16 @@ class PathPlotSettings(BaseModel):
     points: npt.NDArray
     ls: str = "-"
     color: str = "black"
+    marker: str = "None"
 
     def plot(self, ax):
-        ax.plot(self.points[:, 0], self.points[:, 1], ls=self.ls, color=self.color)
+        ax.plot(
+            self.points[:, 0],
+            self.points[:, 1],
+            ls=self.ls,
+            color=self.color,
+            marker=self.marker,
+        )
 
 
 class ScalarPlotSettings(BaseModel):
@@ -33,8 +40,8 @@ class ScalarPlotSettings(BaseModel):
 
     log_compression: bool = True
 
-    colormap: Optional[str] = "seismic"
-    linestyles: Optional[str] = "solid"
+    colormap: Optional[str] = "coolwarm"
+    linestyles: Optional[str] = None
     colors: Optional[str] = None
     contourlevels: int = 20
     vmax: Optional[float] = None
@@ -102,6 +109,9 @@ class VectorPlotSettings(BaseModel):
         return return_vals
 
 
+cm = Paper_Plot.cm
+
+
 class PlotSettings(BaseModel):
     class Config:
         arbitrary_types_allowed = True
@@ -139,6 +149,7 @@ class PlotSettings(BaseModel):
     plot_gradient: Optional[VectorPlotSettings] = None
     plot_mode: Optional[VectorPlotSettings] = None
     plot_gradient_c: Optional[VectorPlotSettings] = None
+    plot_gradient_c2: Optional[VectorPlotSettings] = None
 
     show: bool = False
 
@@ -171,7 +182,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         X = np.linspace(settings.lims[0, 0], settings.lims[0, 1], settings.npoints[0])
         Y = np.linspace(settings.lims[1, 0], settings.lims[1, 1], settings.npoints[1])
         energy = np.empty(shape=settings.npoints)
-        c2 = np.empty(shape=settings.npoints)
+        c = np.empty(shape=settings.npoints)
         mode = np.empty(shape=(*settings.npoints, surface.ndim))
         gradient = np.empty(shape=(*settings.npoints, surface.ndim))
         gradient_c = np.empty(shape=(*settings.npoints, surface.ndim))
@@ -204,10 +215,14 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                         gradient[yi, xi]
                     )
 
-                if settings.plot_c2:
-                    c2[yi, xi] = Rfollower.C([x, y]) ** 2
+                if settings.plot_c2 or settings.plot_gradient_c2:
+                    c[yi, xi] = Rfollower.C([x, y])
 
-                if settings.plot_gradient_c or settings.plot_c_grad_norm:
+                if (
+                    settings.plot_gradient_c
+                    or settings.plot_c_grad_norm
+                    or settings.plot_gradient_c2
+                ):
                     gradient_c[yi, xi] = Rfollower.fd_grad_C([x, y])
     else:
         assert (
@@ -216,7 +231,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         X = np.load(settings.input_data_folder / "X.npy")
         Y = np.load(settings.input_data_folder / "Y.npy")
         energy = np.load(settings.input_data_folder / "energy.npy")
-        c2 = np.load(settings.input_data_folder / "c2.npy")
+        c = np.load(settings.input_data_folder / "c.npy")
         mode = np.load(settings.input_data_folder / "mode.npy")
         gradient = np.load(settings.input_data_folder / "gradient.npy")
         gradient_c = np.load(settings.input_data_folder / "gradient_c.npy")
@@ -228,12 +243,12 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         np.save(settings.output_data_folder / "energy", energy)
         np.save(settings.output_data_folder / "mode", mode)
         np.save(settings.output_data_folder / "gradient", gradient)
-        np.save(settings.output_data_folder / "c2", c2)
+        np.save(settings.output_data_folder / "c", c)
         np.save(settings.output_data_folder / "gradient_c", gradient_c)
         np.save(settings.output_data_folder / "eigenvalues", eigenvalues)
 
     if settings.plot_c2:
-        settings.plot_c2.plot(ax, X, Y, c2)
+        settings.plot_c2.plot(ax, X, Y, c**2)
 
     if settings.plot_energy:
         settings.plot_energy.plot(ax, X, Y, energy)
@@ -255,6 +270,11 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
     if settings.plot_gradient_c:
         settings.plot_gradient_c.plot(
             ax, X, Y, gradient_c[:, :, 0], gradient_c[:, :, 1]
+        )
+
+    if settings.plot_gradient_c2:
+        settings.plot_gradient_c2.plot(
+            ax, X, Y, 2 * c * gradient_c[:, :, 0], 2 * c * gradient_c[:, :, 1]
         )
 
     for path_settings in settings.path_plots:
