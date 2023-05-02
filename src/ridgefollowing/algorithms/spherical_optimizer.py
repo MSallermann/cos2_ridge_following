@@ -4,15 +4,24 @@ from numdifftools import Gradient
 
 
 class SphericalOptimization:
-    def __init__(self, fun, grad, ndim: int, tolerance: float = 1e-6) -> None:
+    def __init__(
+        self,
+        fun,
+        grad,
+        ndim: int,
+        tolerance: float = 1e-6,
+        assert_success: bool = True,
+        disp: bool = False,
+    ) -> None:
         self.ndim: int = ndim
         self.fun = fun
         self.grad = grad
-        self.tolerance = 1e-6
+        self.tolerance: float = tolerance
         self.x_embed = np.zeros(ndim)
         self.x_stereo = np.zeros(ndim - 1)
-        self.pole = 1.0
-        self.disp: bool = False
+        self.pole: float = 1.0
+        self.disp: bool = disp
+        self.assert_success: bool = assert_success
 
     def embed_to_stereo(self, x_embed):
         """Convert embedding space coordinates to stereographic coordinates"""
@@ -64,5 +73,6 @@ class SphericalOptimization:
             jac=self.grad_stero,
             options=dict(disp=self.disp),
         )
-        # assert res.success
+        if self.assert_success:
+            assert res.success
         return self.stereo_to_embed(res.x)

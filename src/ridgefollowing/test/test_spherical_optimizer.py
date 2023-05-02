@@ -14,11 +14,12 @@ def test_spherical_optimizer():
     def jac(x):
         return 2.0 * coeffs * x
 
-    soptimizer = spherical_optimizer.SphericalOptimization(fun, jac, ndim=ndim)
+    soptimizer = spherical_optimizer.SphericalOptimization(
+        fun, jac, ndim=ndim, assert_success=True
+    )
 
     for i in range(10):
-        # x_initial = np.array(np.random.random(ndim))
-        x_initial = np.array(np.ones(ndim))
+        x_initial = np.array(np.random.random(ndim))
 
         x_initial /= np.linalg.norm(x_initial)
 
@@ -59,7 +60,9 @@ def test_pole():
 
     x_initial = np.array([0, 1.0])
 
-    soptimizer = spherical_optimizer.SphericalOptimization(fun, jac, ndim=ndim)
+    soptimizer = spherical_optimizer.SphericalOptimization(
+        fun, jac, ndim=ndim, assert_success=True
+    )
     soptimizer.pole = -1
 
     x_stereo = soptimizer.embed_to_stereo(x_initial)
@@ -83,7 +86,3 @@ def test_pole():
     x_opt_expected[-1] = 1.0
 
     assert np.allclose(np.abs(x_opt), x_opt_expected, atol=1e-5)
-
-
-test_spherical_optimizer()
-test_pole()
