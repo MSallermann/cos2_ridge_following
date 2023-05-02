@@ -1,7 +1,8 @@
 from ridgefollowing import energy_surface
-from ridgefollowing.algorithms import modes
+from ridgefollowing.algorithms import modes, spherical_optimizer
 import numpy.typing as npt
-from typing import Optional, List
+from typing import Optional, List, Union
+from pathlib import Path
 import numpy as np
 from scipy.optimize import minimize
 import numdifftools as nd
@@ -12,7 +13,7 @@ class RidgeFollower:
         self,
         energy_surface: energy_surface.EnergySurface,
         maxiter: int = 1000,
-        tolerance: Optional[float] = 1e-4,
+        tolerance: Optional[float] = 1e-6,
         n_iterations_follow: int = 100,
         radius: float = 0.5e-2,
     ) -> None:
@@ -22,15 +23,24 @@ class RidgeFollower:
         self.radius: float = radius
         self.n_iterations_follow: int = n_iterations_follow
 
+        self.width_modified_gaussian: float = 1.0
+        self.magnitude_modified_gaussian: float = 1.0
+
+        self.print_progress: bool = True
+
+        self.n_modes: int = 2
+
         self.history: dict = dict(
             x_cur=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
             d_cur=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
             E=np.zeros(shape=(self.n_iterations_follow)),
+            G=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
             c2=np.zeros(shape=(self.n_iterations_follow)),
             grad_c2=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
+            eval_diff=np.zeros(shape=(self.n_iterations_follow)),
         )
 
-    def C(self, x: npt.ArrayLike) -> float:
+    def C(self, x: npt.ArrayLike, output_evals: Optional[npt.NDArray] = None) -> float:
         """Computes the cos function
 
         Args:
@@ -41,8 +51,12 @@ class RidgeFollower:
         """
         grad = self.esurf.gradient(x)
         grad /= np.linalg.norm(grad)
-        mode = modes.lowest_mode(self.esurf.hessian(x))[1]
-        return np.dot(grad, mode)
+        evals, evecs = modes.lowest_n_modes(self.esurf.hessian(x), self.n_modes)
+
+        if not output_evals is None:
+            output_evals[:] = evals
+
+        return np.dot(grad, evecs[:, 0])
 
     def fd_grad_C(self, x: npt.ArrayLike) -> npt.NDArray:
         """Computes the gradient of the cos function, using finite differences
@@ -66,6 +80,18 @@ class RidgeFollower:
         """
         return self.fd_grad_C(x)
 
+    def C2_mod(self, x: npt.ArrayLike) -> npt.NDArray:
+        """Computes the modified C2 value"""
+        evals = np.zeros(self.n_modes)
+        C = self.C(x, evals)
+        return C**2 - self.magnitude_modified_gaussian * np.exp(
+            -0.5 / self.width_modified_gaussian**2 * (evals[1] - evals[0]) ** 2
+        )
+
+    def grad_C2_mod(self, x: npt.ArrayLike) -> npt.NDArray:
+        """Computes the gradient of the modified C2 value"""
+        return nd.Gradient(self.C2_mod)(x)
+
     def find_maximum_on_ring(
         self, x0: npt.NDArray, d0: npt.NDArray
     ) -> List[npt.NDArray]:
@@ -79,48 +105,106 @@ class RidgeFollower:
         d0 /= np.linalg.norm(d0)
 
         def fun(d):
-            """-C(x0 + radius*d)**2. Minus us sign because we use scipy.minimize"""
-            return -self.C(x0 + self.radius * d) ** 2
+            """-C(x0 + radius*d)**2. Minus sign because we use scipy.minimize"""
+            return -self.C2_mod(x0 + self.radius * d)
 
         def grad(d):
-            """gradient of C(x0 + radius * d) wrt to d. Minus us sign because we use scipy.minimize"""
+            """gradient of C(x0 + radius * d) wrt to d. Minus sign because we use scipy.minimize"""
             x = x0 + self.radius * d
-            grad_c2_d = 2 * self.C(x) * self.grad_C(x) * self.radius
+            grad_c2_d = self.grad_C2_mod(x) * self.radius
             # project out component along d0
             grad_c2_d -= np.dot(grad_c2_d, d) * d
             return -grad_c2_d
 
-        def cb(d):
-            """renormalize after every iteration"""
-            d /= np.linalg.norm(d)
-
-        res = minimize(
-            fun,
-            d0,
-            method="CG",
-            jac=grad,
-            tol=self.tolerance,
-            options=dict(maxiter=self.maxiter, disp=False),
-            callback=cb,
+        opt = spherical_optimizer.SphericalOptimization(
+            fun=fun, grad=grad, ndim=self.esurf.ndim, tolerance=self.tolerance
         )
+        d_opt = opt.minimize(d0)
 
-        return [res.x, -res.fun, -res.jac]
+        return [d_opt, -fun(d_opt), -grad(d_opt)]
+
+    def sample_on_ring(self, x0: npt.NDArray, npoints=27, use_mod: bool = False):
+        """Sample C2 and the projection of grad_C2 on a ring
+
+        Args:
+            x0 (npt.NDArray): _description_
+            npoints (int, optional): _description_. Defaults to 27.
+        """
+        assert self.esurf.ndim == 2  # only works for two dimensional surfaces
+
+        phi = np.linspace(0, 2 * np.pi, npoints + 1)[:-1]
+        c2 = np.zeros(shape=(npoints, self.esurf.ndim + 1))
+        grad_c2 = np.zeros(shape=(npoints, self.esurf.ndim + 1))
+        dirs = []
+
+        for ip, p in enumerate(phi):
+            d = np.array([np.cos(p), np.sin(p)])
+            dirs.append(d)
+            d_orth = np.array([-d[1], d[0]])
+            x_cur = x0 + self.radius * d
+            if not use_mod:
+                c = self.C(x_cur)
+                c2[ip] = c**2
+                gc2 = 2.0 * c * self.grad_C(x_cur)
+                grad_c2[ip] = np.dot(d_orth, gc2)  # The gradient orthogonal to d0
+            else:
+                c2[ip] = self.C2_mod(x_cur)
+                grad_c2[ip] = np.dot(self.grad_C2_mod(x_cur), d_orth)
+
+        return [phi, c2, grad_c2, np.array(dirs)]
+
+    def find_all_maxima_on_ring(self, x0: npt.NDArray, npoints=27) -> List[npt.NDArray]:
+        """Tries to locate all maxima on a ring of radius
+
+        Args:
+            x0 (npt.NDArray): _description_
+            d0 (npt.NDArray): _description_
+
+        Returns:
+            List[npt.NDArray]: _description_
+        """
+        assert self.esurf.ndim == 2  # only works for two dimensional surfaces
+
+        maxima = np.zeros(shape=(npoints, self.esurf.ndim + 1))
+
+        for iphi, phi in enumerate(np.linspace(0, 2 * np.pi, npoints + 1)[:-1]):
+            d0 = np.array([np.cos(phi), np.sin(phi)])
+            d_opt, value, _ = self.find_maximum_on_ring(x0, d0)
+            maxima[iphi] = [*d_opt, value]
+
+        # Filter out duplicate maxima
+        maxima = np.round(maxima, 4)
+        return maxima
 
     def follow(self, x0: npt.NDArray, d0: npt.NDArray):
-        self.history = []
-
         x_cur = np.array(x0)
         d_cur = np.array(d0)
 
         for i in range(self.n_iterations_follow):
+            if self.print_progress:
+                prog = i / self.n_iterations_follow * 100
+                print(
+                    f"Iteration {i} / {self.n_iterations_follow} ( {prog:.3f}% )",
+                    end="\r",
+                )
+
+            # Save old direction
+            d_prev = d_cur
+
             # Find maximum on ring
-            d_cur, c2, grad_c2 = self.find_maximum_on_ring(x_cur, d_cur)
+            d_cur, c2, grad_c2 = self.find_maximum_on_ring(x_cur, d_prev)
+
+            # Angle between old and current direction
+            np.dot(d_prev, d_cur)
+
             x_cur += self.radius * d_cur
 
             E = self.esurf.energy(x_cur)
+            G = self.esurf.gradient(x_cur)
 
             self.history["x_cur"][i] = np.array(x_cur)
             self.history["d_cur"][i] = np.array(d_cur)
             self.history["c2"][i] = c2
             self.history["grad_c2"][i] = grad_c2
             self.history["E"][i] = E
+            self.history["G"][i] = G
