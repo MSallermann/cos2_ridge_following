@@ -1,4 +1,5 @@
 from ridgefollowing.algorithms import spherical_optimizer
+from ridgefollowing.surfaces import gaussians
 import numpy as np
 from numdifftools import Gradient
 
@@ -29,7 +30,7 @@ def test_spherical_optimizer():
 
         assert np.isclose(f_embed, f_stereo)
 
-        grad_stereo = soptimizer.grad_stero(x_stereo)
+        grad_stereo = soptimizer.grad_stereo(x_stereo)
         fd_grad_stereo = Gradient(soptimizer.f_stereo)(x_stereo)
         assert np.allclose(grad_stereo, fd_grad_stereo)
 
@@ -41,11 +42,11 @@ def test_spherical_optimizer():
     x_initial = np.ones(ndim)
     x_initial /= np.linalg.norm(x_initial)
 
-    x_opt = soptimizer.minimize(x_initial)
+    res = soptimizer.minimize(x_initial)
     x_opt_expected = np.zeros(ndim)
     x_opt_expected[5] = 1.0
 
-    assert np.allclose(x_opt, x_opt_expected, atol=1e-5)
+    assert np.allclose(res.x_opt, x_opt_expected, atol=1e-5)
 
 
 def test_pole():
@@ -58,20 +59,20 @@ def test_pole():
     def jac(x):
         return 2.0 * coeffs * x
 
-    x_initial = np.array([0, 1.0])
+    x_initial = np.array([1.0, 1.0])
+    x_initial /= np.linalg.norm(x_initial)
 
     soptimizer = spherical_optimizer.SphericalOptimization(
-        fun, jac, ndim=ndim, assert_success=True
+        fun, jac, ndim=ndim, assert_success=True, disp=True, maxiter=10
     )
-    soptimizer.pole = -1
+    soptimizer.pole = 1
 
     x_stereo = soptimizer.embed_to_stereo(x_initial)
     f_embed = fun(x_initial)
     f_stereo = soptimizer.f_stereo(x_stereo)
-
     assert np.isclose(f_embed, f_stereo)
 
-    grad_stereo = soptimizer.grad_stero(x_stereo)
+    grad_stereo = soptimizer.grad_stereo(x_stereo)
     fd_grad_stereo = Gradient(soptimizer.f_stereo)(x_stereo)
 
     assert np.allclose(grad_stereo, fd_grad_stereo)
@@ -81,8 +82,13 @@ def test_pole():
 
     assert np.isclose(np.linalg.norm(x_embed), 1.0)
 
-    x_opt = soptimizer.minimize(x_initial)
+    res = soptimizer.minimize(x_initial)
     x_opt_expected = np.zeros(ndim)
     x_opt_expected[-1] = 1.0
+    assert np.allclose(np.abs(res.x_opt), x_opt_expected, atol=1e-5)
+
+    assert soptimizer.pole == -1  # Pole should have automatically switched
+
+
 
     assert np.allclose(np.abs(x_opt), x_opt_expected, atol=1e-5)

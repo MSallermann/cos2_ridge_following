@@ -1,9 +1,25 @@
-from scipy.optimize import minimize
+from ridgefollowing.algorithms import ncg
 import numpy as np
+import numpy.typing as npt
 from numdifftools import Gradient
+from typing import Optional
+from pydantic import BaseModel
 
 
 class SphericalOptimization:
+    class Result(BaseModel):
+        class Config:
+            arbitrary_types_allowed = True
+
+        x_opt: npt.NDArray
+        g_opt: npt.NDArray
+        f_opt: float
+
+        x_opt_stero: npt.NDArray
+        g_opt_stero: npt.NDArray
+
+        iterations_total: Optional[int] = None
+
     def __init__(
         self,
         fun,
