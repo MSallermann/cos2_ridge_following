@@ -1,6 +1,7 @@
 import numpy.typing as npt
 import numpy as np
 import numdifftools as nd
+from typing import Optional
 
 
 class NonLinearConjugateGradient:
@@ -8,7 +9,7 @@ class NonLinearConjugateGradient:
         self,
         fun_grad_cb,
         ndim: int,
-        maxiter: int = 1000,
+        maxiter: Optional[int] = 1000,
         maxiter_ls: int = 10,
         disp: bool = False,
         tolerance: float = 1e-6,
@@ -56,47 +57,6 @@ class NonLinearConjugateGradient:
             return np.max(beta, 0)
         else:
             return 0.0
-
-    def linesearch(self, initial_alpha=1.0):
-        alpha = initial_alpha
-        run = True
-
-        factor = 2
-        iter = 0
-
-        armijo_condition = False
-        curvature_condition = False
-
-        self.message("    Begin Linesearch")
-        while run:
-            x = self._x_cur + alpha * self.sn
-            f_alpha, g_alpha = self.fun_grad_cb(x)
-
-            armijo_condition = f_alpha < self._fcur + self.wolfe_c1 * alpha * np.dot(
-                self.sn, self._gcur
-            )
-            curvature_condition = -np.dot(self.sn, g_alpha) < -self.wolfe_c2 * np.dot(
-                self.sn, self._gcur
-            )
-
-            if not armijo_condition:
-                alpha /= factor
-            elif not curvature_condition:
-                alpha *= factor
-            else:
-                run = False
-
-            iter += 1
-            if iter >= self.max_iter_ls:
-                run = False
-
-            self.message(
-                f"          Iteration {iter}, alpha = {alpha}, f = {f_alpha}, |g| = {np.linalg.norm(g_alpha)}, armijo = {armijo_condition}, curvature = {curvature_condition}"
-            )
-
-        self._x_cur = x
-        self._fcur, self._gcur = f_alpha, g_alpha
-        return alpha
 
     def linesearch_parabola(self, initial_alpha=1.0):
         self.message("    Begin parabola linesearch")
@@ -150,6 +110,11 @@ class NonLinearConjugateGradient:
         self._x_cur = x0.copy()
         self._fcur, self._gcur = self.fun_grad_cb(self._x_cur)
 
+        if np.linalg.norm(self._gcur) < self.tolerance:
+            run = False
+            self.message("Gradient is already close to zero. Stopping")
+            return
+
         while run:
             self.delta_xn_prev = self.delta_xn  # save delta_xn_previous
             self.delta_xn = -self._gcur  # delta_xn is the direction of steepest descent
@@ -161,7 +126,6 @@ class NonLinearConjugateGradient:
             self.sn *= beta
             self.sn += self.delta_xn
 
-            # self.alpha_prev = self.linesearch(self.alpha_prev)
             self.alpha_prev = self.linesearch_parabola(self.alpha_prev)
 
             self._iter += 1
