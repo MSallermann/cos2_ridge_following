@@ -59,7 +59,9 @@ class NonLinearConjugateGradient:
             return 0.0
 
     def linesearch_parabola(self, initial_alpha=1.0):
+        self.message("---------------------------------")
         self.message("    Begin parabola linesearch")
+        self.message("---------------------------------")
 
         iter = 0
 
@@ -73,6 +75,11 @@ class NonLinearConjugateGradient:
         f_alpha, g_alpha = self.fun_grad_cb(x)
         g_dot_s = np.dot(g_alpha, s)
 
+        print(alpha)
+        self.message(
+            f"                          f_cur = {self._fcur::>10.3e}, g_dot_s_cur = {g_dot_s_cur::>10.3e}, f_alpha = {f_alpha::>10.3e}, g_dot_s = {g_dot_s:>10.3e}\n"
+        )
+
         while True:
             # Check for convergence
             if np.abs(g_dot_s) < self.tolerance:
@@ -82,7 +89,25 @@ class NonLinearConjugateGradient:
             # p(a) = f_cur + g_cur * a + c*alpha**2
             c = (g_dot_s - g_dot_s_cur) / (2.0 * alpha)
             alpha_opt = -g_dot_s_cur / (2.0 * c)
-            alpha = alpha_opt
+
+            if (
+                alpha_opt < 0
+            ):  # If alpha_opt would lead us bakcwards we use the wolfe conditions instead
+                armijo_condition = (
+                    f_alpha
+                    < self._fcur + self.wolfe_c1 * alpha * np.dot(self.sn, self._gcur)
+                )
+                curvature_condition = -np.dot(
+                    self.sn, g_alpha
+                ) < -self.wolfe_c2 * np.dot(self.sn, self._gcur)
+                if not armijo_condition:
+                    alpha /= 2
+                elif not curvature_condition:
+                    alpha *= 2
+                else:
+                    break
+            else:
+                alpha = alpha_opt
 
             x = self._x_cur + alpha * s
             f_alpha, g_alpha = self.fun_grad_cb(x)
@@ -93,10 +118,10 @@ class NonLinearConjugateGradient:
                 break
 
             self.message(
-                f"          Iteration {iter}, alpha = {alpha}, f = {f_alpha}, |g| = {np.linalg.norm(g_alpha)}"
+                f"          Iteration {iter}:    alpha = {alpha:.3e}, f = {f_alpha::>10.3e}, |g| = {np.linalg.norm(g_alpha):>10.3e}"
             )
             self.message(
-                f"          ... g_dot_s {g_dot_s}, g_dot_s_cur {g_dot_s_cur}, f_cur = {self._fcur}, f_alpha = {f_alpha}"
+                f"                          f_cur = {self._fcur::>10.3e}, g_dot_s_cur = {g_dot_s_cur::>10.3e}, f_alpha = {f_alpha::>10.3e}, g_dot_s = {g_dot_s:>10.3e}\n"
             )
 
         self._x_cur = x
@@ -126,7 +151,7 @@ class NonLinearConjugateGradient:
             self.sn *= beta
             self.sn += self.delta_xn
 
-            self.alpha_prev = self.linesearch_parabola(self.alpha_prev)
+            self.alpha_prev = self.linesearch_parabola(1.0)
 
             self._iter += 1
 
@@ -137,6 +162,8 @@ class NonLinearConjugateGradient:
                 run = False
 
             self.message(
-                f"Iteration {self._iter} (max. {self.max_iter}), f = {self._fcur}, |g| = {np.linalg.norm(self._gcur)}"
+                f"Iteration {self._iter} (max. {self.max_iter}), f = {self._fcur:.3e}, |g| = {np.linalg.norm(self._gcur):.3e}"
+                + "\n"
+                + 50 * "="
             )
         return [self._x_cur, self._fcur, self._gcur]
