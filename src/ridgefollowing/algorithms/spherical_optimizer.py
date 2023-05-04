@@ -56,11 +56,15 @@ class SphericalOptimization:
 
     def embed_to_stereo(self, x_embed):
         """Convert embedding space coordinates to stereographic coordinates"""
+        assert len(x_embed) == self.ndim
+
         self.x_stereo[:] = x_embed[:-1] / (1.0 - self.pole * x_embed[-1])
         return self.x_stereo
 
     def stereo_to_embed(self, x_stereo):
         """Convert stereographic coordinates to embedding space coordinates"""
+        assert len(x_stereo) == self.ndim - 1
+
         s2 = np.linalg.norm(x_stereo) ** 2
         self.x_embed[-1] = self.pole * (s2 - 1.0) / (s2 + 1.0)
         self.x_embed[:-1] = x_stereo * (1.0 - self.pole * self.x_embed[-1])
@@ -68,12 +72,16 @@ class SphericalOptimization:
 
     def f_stereo(self, x_stereo):
         """Compute the function value from stereographic coordinates"""
+        assert len(x_stereo) == self.ndim - 1
+
         self.x_embed = self.stereo_to_embed(x_stereo)
         res = self.fun(self.x_embed)
         return res
 
     def grad_stereo(self, x_stereo):
         """Compute the function gradient from stereographic coordinates"""
+        assert len(x_stereo) == self.ndim - 1
+
         x_embed = self.stereo_to_embed(x_stereo)
         grad_embed = self.grad(x_embed)
         grad_stereo = np.zeros(len(x_stereo))
