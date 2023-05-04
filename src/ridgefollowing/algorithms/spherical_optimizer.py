@@ -90,15 +90,19 @@ class SphericalOptimization:
 
         return grad_stereo
 
+    def switch_pole_cb(self, x_stereo):
+        self.switch_pole_if_necessary(self.stereo_to_embed(x_stereo))
+
     def minimize(self, x0) -> Result:
         self.switch_pole_if_necessary(x0)
+
         res = minimize(
             fun=self.f_stereo,
             method="L-BFGS-B",
             x0=self.embed_to_stereo(x0),
             jac=self.grad_stereo,
             options=dict(disp=self.disp),
-            callback=self.switch_pole_if_necessary,
+            callback=self.switch_pole_cb,
         )
 
         if self.assert_success:
