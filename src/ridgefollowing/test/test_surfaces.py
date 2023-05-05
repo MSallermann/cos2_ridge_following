@@ -7,6 +7,7 @@ from ridgefollowing.surfaces import (
     lepsho,
     lepshogauss,
     quadratic,
+    cubic,
 )
 import numpy as np
 import pytest
@@ -36,7 +37,10 @@ def test_against_fd():
     # 4. Quadratic surface
     esurf_quadratic = quadratic.QuadraticSurface(hessian=np.diag([2, 4]))
 
-    # 2. A more general gaussian surface
+    # 5. Cubic surface
+    esurf_cubic = cubic.CubicSurface()
+
+    # 6. A more general gaussian surface
     ndim = 12
     ngauss = 3
     magnitudes = np.linspace(-5, 5, ngauss)
@@ -73,6 +77,7 @@ def test_against_fd():
         [esurf_lepsho, test_points_2d],
         [esurf_lepshogauss, test_points_2d],
         [esurf_quadratic, test_points_2d],
+        # [esurf_cubic, test_points_2d],
         [esurf_gauss, test_points_gauss],
     ]:
         for x in test_points:
@@ -100,10 +105,15 @@ def test_against_fd():
 
             # Curvature, just take the first test point as direction
             dir = test_points[0] / np.linalg.norm(test_points[0])
-            curvature_fd = esurf.fd_curvature(x, test_points[0])
-            curvature = esurf.curvature(x, test_points[0])
 
+            curvature_fd = esurf.fd_curvature(x, dir)
+            curvature = esurf.curvature(x, dir)
+
+            print("curvature_fd ", curvature_fd)
+            print("curvature ", curvature)
             assert np.allclose(curvature_fd, curvature)
+
+            print("hessian * dir ", hessian @ dir)
             assert np.allclose(
-                curvature, np.matmul(hessian, dir)
+                curvature, hessian @ dir
             )  # The curvature should be equivalent to the action of the hessian

@@ -11,5 +11,5 @@ settings = plot_surface.PlotSettings(
     npoints=[128, 128],
 )
 
-esurf = quadratic.QuadraticSurface( np.diag([1,1]) )
+esurf = quadratic.QuadraticSurface( np.diag([1,2]) )
 plot_surface.plot(esurf, settings=settings)

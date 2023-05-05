@@ -53,6 +53,8 @@ class EnergySurface(abc.ABC):
             x (npt.ArrayLike): the point on the energy surface
             dir (npt.ArrayLike): the direction
 
+        Attention!: dir must be normalized
+
         Returns:
             np.ArrayLike: the curvature, equivalent to Hessian * dir
         """
@@ -88,6 +90,8 @@ class EnergySurface(abc.ABC):
         Args:
             x (npt.ArrayLike): the point on the energy surface
             dir (npt.ArrayLike): the direction
+
+        Attention!: dir must be normalized
 
         Returns:
             np.ArrayLike: the curvature, equivalent to Hessian * dir
