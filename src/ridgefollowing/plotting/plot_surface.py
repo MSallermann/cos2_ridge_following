@@ -47,6 +47,8 @@ class ScalarPlotSettings(BaseModel):
     vmax: Optional[float] = None
     vmin: Optional[float] = None
 
+    zorder: int = 0
+
     def plot(self, ax, X, Y, Z):
         plot_funcs = []
         if self.contours:
@@ -74,6 +76,7 @@ class ScalarPlotSettings(BaseModel):
                     cmap=self.colormap,
                     colors=self.colors,
                     linestyles=self.linestyles,
+                    zorder=self.zorder,
                 )
             )
         return return_vals
@@ -86,6 +89,12 @@ class VectorPlotSettings(BaseModel):
     streamplot: bool = True
     quiver: bool = False
     color: Optional[str] = None
+    kwargs: Optional[dict] = dict()
+    sampling: int = 1
+
+    zorder: int = 0
+
+    label: Optional[str] = None
 
     def plot(self, ax, X, Y, U, V):
         plot_funcs = []
@@ -99,11 +108,14 @@ class VectorPlotSettings(BaseModel):
         for f in plot_funcs:
             return_vals.append(
                 f(
-                    X,
-                    Y,
-                    U,
-                    V,
+                    X[:: self.sampling],
+                    Y[:: self.sampling],
+                    U[:: self.sampling, :: self.sampling],
+                    V[:: self.sampling, :: self.sampling],
                     color=self.color,
+                    label=self.label,
+                    zorder=self.zorder,
+                    **self.kwargs,
                 )
             )
         return return_vals
@@ -145,6 +157,8 @@ class PlotSettings(BaseModel):
     plot_c2: Optional[ScalarPlotSettings] = None
     plot_evaldiff: Optional[ScalarPlotSettings] = None
     plot_c_grad_norm: Optional[ScalarPlotSettings] = None
+    plot_c2_mod: Optional[ScalarPlotSettings] = None
+    plot_sum_c2: Optional[ScalarPlotSettings] = None
 
     plot_gradient: Optional[VectorPlotSettings] = None
     plot_mode: Optional[VectorPlotSettings] = None
@@ -183,7 +197,9 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         Y = np.linspace(settings.lims[1, 0], settings.lims[1, 1], settings.npoints[1])
         energy = np.empty(shape=settings.npoints)
         c = np.empty(shape=settings.npoints)
+        sum_c2 = np.empty(shape=settings.npoints)
         mode = np.empty(shape=(*settings.npoints, surface.ndim))
+        mode2 = np.empty(shape=(*settings.npoints, surface.ndim))
         gradient = np.empty(shape=(*settings.npoints, surface.ndim))
         gradient_c = np.empty(shape=(*settings.npoints, surface.ndim))
         eigenvalues = np.empty(shape=(*settings.npoints, surface.ndim))
@@ -202,18 +218,23 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
 
                 energy[yi, xi] = surface.energy([x, y])
 
-                if settings.plot_mode or settings.plot_evaldiff:
+                if settings.plot_mode or settings.plot_evaldiff or settings.plot_sum_c2:
                     hessian = surface.hessian([x, y])
                     eigenvals, eigenvecs = modes.eigenpairs(hessian)
 
-                    mode[yi, xi] = eigenvecs[0]
+                    mode[yi, xi] = eigenvecs[:, 0]
+                    mode2[yi, xi] = eigenvecs[:, 1]
                     eigenvalues[yi, xi] = eigenvals
 
-                if settings.plot_gradient:
+                if settings.plot_gradient or settings.plot_sum_c2:
                     gradient[yi, xi] = surface.gradient([x, y])
                     gradient[yi, xi] = gradient[yi, xi] / np.linalg.norm(
                         gradient[yi, xi]
                     )
+                    sum_c2[yi, xi] = (
+                        np.dot(gradient[yi, xi], mode[yi, xi]) ** 2
+                        + np.dot(gradient[yi, xi], mode2[yi, xi])
+                    ) ** 2
 
                 if settings.plot_c2 or settings.plot_gradient_c2:
                     c[yi, xi] = Rfollower.C([x, y])
@@ -230,22 +251,49 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         )
         X = np.load(settings.input_data_folder / "X.npy")
         Y = np.load(settings.input_data_folder / "Y.npy")
-        energy = np.load(settings.input_data_folder / "energy.npy")
-        c = np.load(settings.input_data_folder / "c.npy")
-        mode = np.load(settings.input_data_folder / "mode.npy")
-        gradient = np.load(settings.input_data_folder / "gradient.npy")
-        gradient_c = np.load(settings.input_data_folder / "gradient_c.npy")
-        eigenvalues = np.load(settings.input_data_folder / "eigenvalues.npy")
+
+        if (settings.input_data_folder / "energy.npy").exists():
+            energy = np.load(settings.input_data_folder / "energy.npy")
+        if (settings.input_data_folder / "c.npy").exists():
+            c = np.load(settings.input_data_folder / "c.npy")
+        if (settings.input_data_folder / "mode.npy").exists():
+            mode = np.load(settings.input_data_folder / "mode.npy")
+        if (settings.input_data_folder / "mode2.npy").exists():
+            mode2 = np.load(settings.input_data_folder / "mode2.npy")
+        if (settings.input_data_folder / "sum_c2.npy").exists():
+            sum_c2 = np.load(settings.input_data_folder / "sum_c2.npy")
+        if (settings.input_data_folder / "gradient.npy").exists():
+            gradient = np.load(settings.input_data_folder / "gradient.npy")
+        if (settings.input_data_folder / "gradient_c.npy").exists():
+            gradient_c = np.load(settings.input_data_folder / "gradient_c.npy")
+        if (settings.input_data_folder / "eigenvalues.npy").exists():
+            eigenvalues = np.load(settings.input_data_folder / "eigenvalues.npy")
 
     if not settings.output_data_folder is None:
         np.save(settings.output_data_folder / "X", X)
         np.save(settings.output_data_folder / "Y", Y)
-        np.save(settings.output_data_folder / "energy", energy)
-        np.save(settings.output_data_folder / "mode", mode)
-        np.save(settings.output_data_folder / "gradient", gradient)
-        np.save(settings.output_data_folder / "c", c)
-        np.save(settings.output_data_folder / "gradient_c", gradient_c)
-        np.save(settings.output_data_folder / "eigenvalues", eigenvalues)
+
+        if settings.plot_energy:
+            np.save(settings.output_data_folder / "energy", energy)
+
+        if settings.plot_mode or settings.plot_evaldiff or settings.plot_sum_c2:
+            np.save(settings.output_data_folder / "eigenvalues", eigenvalues)
+            np.save(settings.output_data_folder / "mode", mode)
+            np.save(settings.output_data_folder / "mode2", mode2)
+            np.save(settings.output_data_folder / "sum_c2", sum_c2)
+
+        if settings.plot_gradient:
+            np.save(settings.output_data_folder / "gradient", gradient)
+
+        if settings.plot_c2 or settings.plot_gradient_c2:
+            np.save(settings.output_data_folder / "c", c)
+
+        if (
+            settings.plot_gradient_c
+            or settings.plot_c_grad_norm
+            or settings.plot_gradient_c2
+        ):
+            np.save(settings.output_data_folder / "gradient_c", gradient_c)
 
     if settings.plot_c2:
         settings.plot_c2.plot(ax, X, Y, c**2)
@@ -260,6 +308,9 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
 
     if settings.plot_c_grad_norm:
         settings.plot_c_grad_norm.plot(ax, X, Y, np.linalg.norm(gradient_c, axis=2))
+
+    if settings.plot_sum_c2:
+        settings.plot_sum_c2.plot(ax, X, Y, sum_c2)
 
     if settings.plot_mode:
         settings.plot_mode.plot(ax, X, Y, mode[:, :, 0], mode[:, :, 1])
@@ -288,6 +339,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
 
     ax.set_xlabel("x")
     ax.set_ylabel("y")
+    ax.legend()
 
     if not settings.outfile is None:
         fig.savefig(settings.outfile, dpi=settings.dpi)
