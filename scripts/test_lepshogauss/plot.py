@@ -6,8 +6,8 @@ import numpy as np
 
 esurf = lepshogauss.LepsHOGaussSurface()
 
-lims = np.array( [[1,1.225], [-1.5,-0.4]] )
-folder = "./data_500_zoomed"
+# lims = np.array( [[1,1.225], [-1.5,-0.4]] )
+# folder = "./data_500_zoomed"
 
 lims = np.array([[0.25, 3.5], [-5, 5]])
 folder = Path("./data500")
