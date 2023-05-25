@@ -162,6 +162,7 @@ class PlotSettings(BaseModel):
 
     plot_gradient: Optional[VectorPlotSettings] = None
     plot_mode: Optional[VectorPlotSettings] = None
+    plot_mode2: Optional[VectorPlotSettings] = None
     plot_gradient_c: Optional[VectorPlotSettings] = None
     plot_gradient_c2: Optional[VectorPlotSettings] = None
 
@@ -218,7 +219,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
 
                 energy[yi, xi] = surface.energy([x, y])
 
-                if settings.plot_mode or settings.plot_evaldiff or settings.plot_sum_c2:
+                if settings.plot_mode or settings.plot_mode2 or settings.plot_evaldiff or settings.plot_sum_c2:
                     hessian = surface.hessian([x, y])
                     eigenvals, eigenvecs = modes.eigenpairs(hessian)
 
@@ -314,6 +315,9 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
 
     if settings.plot_mode:
         settings.plot_mode.plot(ax, X, Y, mode[:, :, 0], mode[:, :, 1])
+
+    if settings.plot_mode2:
+        settings.plot_mode2.plot(ax, X, Y, mode2[:, :, 0], mode2[:, :, 1])
 
     if not settings.plot_gradient is None:
         settings.plot_gradient.plot(ax, X, Y, gradient[:, :, 0], gradient[:, :, 1])

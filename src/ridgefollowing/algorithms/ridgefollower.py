@@ -13,7 +13,7 @@ class RidgeFollower:
         self,
         energy_surface: energy_surface.EnergySurface,
         maxiter: int = 1000,
-        tolerance: Optional[float] = 1e-6,
+        tolerance: Optional[float] = 1e-4,
         n_iterations_follow: int = 100,
         radius: float = 0.5e-2,
     ) -> None:
@@ -92,6 +92,22 @@ class RidgeFollower:
         """Computes the gradient of the modified C2 value"""
         return nd.Gradient(self.C2_mod)(x)
 
+    def C2_anharmonic(
+        self, x0: npt.NDArray, g0: npt.NDArray, h0: npt.NDArray, x: npt.NDArray
+    ):
+        # hessian = self.esurf.hessian(x) - h0
+        # grad = self.esurf.gradient(x) - g0 - h0@(x-x0)
+
+        hessian = h0
+        hessian = self.esurf.hessian(x)
+
+        grad = self.esurf.gradient(x)  # g0 + h0@(x-x0)
+        grad = g0 + h0 @ (x - x0)
+        grad /= np.linalg.norm(grad)
+
+        evals, evecs = modes.lowest_n_modes(hessian, self.n_modes)
+        return np.dot(grad, evecs[:, 0]) ** 2
+
     def find_maximum_on_ring(
         self, x0: npt.NDArray, d0: npt.NDArray
     ) -> List[npt.NDArray]:
@@ -117,13 +133,18 @@ class RidgeFollower:
             return -grad_c2_d
 
         opt = spherical_optimizer.SphericalOptimization(
-            fun=fun, grad=grad, ndim=self.esurf.ndim, tolerance=self.tolerance
+            fun=fun,
+            grad=grad,
+            ndim=self.esurf.ndim,
+            tolerance=self.tolerance,
+            assert_success=False,
+            disp=False,
         )
-        d_opt = opt.minimize(d0)
+        res = opt.minimize(d0)
 
-        return [d_opt, -fun(d_opt), -grad(d_opt)]
+        return [res.x_opt, -res.f_opt, -res.g_opt]
 
-    def sample_on_ring(self, x0: npt.NDArray, npoints=27, use_mod: bool = False):
+    def sample_on_ring(self, x0: npt.NDArray, npoints=27, anharmonic: bool = False):
         """Sample C2 and the projection of grad_C2 on a ring
 
         Args:
@@ -133,20 +154,22 @@ class RidgeFollower:
         assert self.esurf.ndim == 2  # only works for two dimensional surfaces
 
         phi = np.linspace(0, 2 * np.pi, npoints + 1)[:-1]
-        c2 = np.zeros(shape=(npoints, self.esurf.ndim + 1))
+        c2 = np.zeros(shape=(npoints))
         grad_c2 = np.zeros(shape=(npoints, self.esurf.ndim + 1))
         dirs = []
+
+        if anharmonic:
+            h0 = self.esurf.hessian(x0)
+            g0 = self.esurf.gradient(x0)
 
         for ip, p in enumerate(phi):
             d = np.array([np.cos(p), np.sin(p)])
             dirs.append(d)
             d_orth = np.array([-d[1], d[0]])
             x_cur = x0 + self.radius * d
-            if not use_mod:
-                c = self.C(x_cur)
-                c2[ip] = c**2
-                gc2 = 2.0 * c * self.grad_C(x_cur)
-                grad_c2[ip] = np.dot(d_orth, gc2)  # The gradient orthogonal to d0
+
+            if anharmonic:
+                c2[ip] = self.C2_anharmonic(x0, g0, h0, x_cur)
             else:
                 c2[ip] = self.C2_mod(x_cur)
                 grad_c2[ip] = np.dot(self.grad_C2_mod(x_cur), d_orth)
@@ -165,15 +188,15 @@ class RidgeFollower:
         """
         assert self.esurf.ndim == 2  # only works for two dimensional surfaces
 
-        maxima = np.zeros(shape=(npoints, self.esurf.ndim + 1))
+        maxima = np.zeros(shape=(npoints, self.esurf.ndim + 5))
 
         for iphi, phi in enumerate(np.linspace(0, 2 * np.pi, npoints + 1)[:-1]):
             d0 = np.array([np.cos(phi), np.sin(phi)])
-            d_opt, value, _ = self.find_maximum_on_ring(x0, d0)
-            maxima[iphi] = [*d_opt, value]
+            d_opt, c2, grad_c2 = self.find_maximum_on_ring(x0, d0)
+            phi_opt = np.arctan2(d_opt[1], d_opt[0])
+            maxima[iphi] = [*d_opt, phi, phi_opt, c2, *grad_c2]
 
         # Filter out duplicate maxima
-        maxima = np.round(maxima, 4)
         return maxima
 
     def follow(self, x0: npt.NDArray, d0: npt.NDArray):
@@ -194,8 +217,10 @@ class RidgeFollower:
             # Find maximum on ring
             d_cur, c2, grad_c2 = self.find_maximum_on_ring(x_cur, d_prev)
 
-            # Angle between old and current direction
-            np.dot(d_prev, d_cur)
+            if np.dot(d_cur, d_prev) < 0:
+                print(f"Return detected at iteration {i}")
+                print(f"x_cur = [{x_cur}]")
+                print(modes.eigenpairs(self.esurf.hessian(x_cur)))
 
             x_cur += self.radius * d_cur
 
