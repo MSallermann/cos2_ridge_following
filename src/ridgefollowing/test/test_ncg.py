@@ -22,11 +22,12 @@ def test_ncg_quadratic():
     )
 
     x0 = np.ones(ndim)
-    x_opt, f_opt, g_opt = ncg_opt.minimize(x0)
+    res = ncg_opt.minimize(x0)
 
-    assert np.isclose(f_opt, 0.0, atol=ncg_opt.tolerance)
-    assert np.allclose(x_opt, np.zeros(ndim), atol=ncg_opt.tolerance)
-    assert np.allclose(g_opt, np.zeros(ndim), atol=ncg_opt.tolerance)
+    assert np.isclose(res.f_opt, 0.0, atol=ncg_opt.tolerance)
+    assert np.allclose(res.x_opt, np.zeros(ndim), atol=ncg_opt.tolerance)
+    assert np.allclose(res.g_opt, np.zeros(ndim), atol=ncg_opt.tolerance)
+    assert res.iterations_total <= 12
 
 
 def test_ncg():
@@ -48,6 +49,6 @@ def test_ncg():
     )
 
     x0 = np.ones(ndim)
-    x_opt, f_opt, g_opt = ncg_opt.minimize(x0)
+    res = ncg_opt.minimize(x0)
 
-    assert np.allclose(g_opt, np.zeros(ndim), atol=ncg_opt.tolerance)
+    assert np.allclose(res.g_opt, np.zeros(ndim), atol=ncg_opt.tolerance)
