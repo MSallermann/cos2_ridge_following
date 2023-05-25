@@ -219,7 +219,12 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
 
                 energy[yi, xi] = surface.energy([x, y])
 
-                if settings.plot_mode or settings.plot_mode2 or settings.plot_evaldiff or settings.plot_sum_c2:
+                if (
+                    settings.plot_mode
+                    or settings.plot_mode2
+                    or settings.plot_evaldiff
+                    or settings.plot_sum_c2
+                ):
                     hessian = surface.hessian([x, y])
                     eigenvals, eigenvecs = modes.eigenpairs(hessian)
 
