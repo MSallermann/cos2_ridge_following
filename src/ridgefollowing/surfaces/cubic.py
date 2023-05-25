@@ -5,11 +5,33 @@ import numpy.typing as npt
 
 class CubicSurface(quadratic.QuadraticSurface):
     def __init__(self, matrix=np.diag([1.0, 2.0])):
-        self.f1 = 0.1
-        self.f2 = 0.1
-        self.c1 = -0.3
-        self.c2 = 0.2
+        self.f1 = -0.1 * 1
+        self.f2 = -0.1 * 1
+        self.c1 = 0.05 * 1
+        self.c2 = -0.05 * 1
+
+        self._f1 = 0.0
+        self._f2 = 0.0
+        self._c1 = 0.0
+        self._c2 = 0.0
+
         super().__init__(matrix, 2)
+
+    def disable_anharmonicity(self):
+        self._f1 = self.f1
+        self._f2 = self.f2
+        self._c1 = self.c1
+        self._c2 = self.c2
+        self.f1 = 0.0
+        self.f2 = 0.0
+        self.c1 = 0.0
+        self.c2 = 0.0
+
+    def enable_anharmonicity(self):
+        self.f1 = self._f1
+        self.f2 = self._f2
+        self.c1 = self._c1
+        self.c2 = self._c2
 
     def energy(self, x: npt.ArrayLike) -> float:
         return (
@@ -44,4 +66,5 @@ class CubicSurface(quadratic.QuadraticSurface):
 
         h[0, :] += 6.0 * self.c1 * x[0]
         h[1, :] += 6.0 * self.c2 * x[1]
+
         return h
