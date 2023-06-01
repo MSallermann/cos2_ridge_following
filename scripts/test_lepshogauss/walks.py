@@ -1,5 +1,5 @@
 from ridgefollowing.surfaces import lepshogauss
-from ridgefollowing.algorithms import minimizer, ridgefollower
+from ridgefollowing.algorithms import minimizer, cosine_follower
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,7 +7,7 @@ import numpy.typing as npt
 
 
 esurf = lepshogauss.LepsHOGaussSurface()
-follower = ridgefollower.RidgeFollower(
+follower = cosine_follower.CosineFollower(
     energy_surface=esurf, radius=1e-1, n_iterations_follow=100
 )
 
@@ -34,10 +34,10 @@ min = minimizer.Minimizer(energy_surface=esurf)
 x_min = min.minimize_energy(x0=np.array([1.0, 0.0]))
 
 # """Run from the bifurcation point"""
-# x_bif = np.array( [1.006, -4.31109] )
-# phi_list = np.array( [np.pi/2] )
+x_bif = np.array( [1.006, -4.31109] )
+phi_list = np.array( [np.pi/2] )
 
-# phi_walks( x0=x_bif, width=0.5, output_dir=Path("./walks_bifurcation_1"), phi=phi_list )
+phi_walks( x0=x_bif, width=0.5, output_dir=Path("./walks_bifurcation_1"), phi=phi_list )
 # phi_walks( x0=x_bif, width=0.6, output_dir=Path("./walks_bifurcation_2"), phi=phi_list )
 # phi_walks( x0=x_bif, width=0.7, output_dir=Path("./walks_bifurcation_3"), phi=phi_list )
 # phi_walks( x0=x_bif, width=0.8, output_dir=Path("./walks_bifurcation_4"), phi=phi_list )
