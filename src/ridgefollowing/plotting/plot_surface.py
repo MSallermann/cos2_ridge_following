@@ -1,5 +1,5 @@
 from ridgefollowing import energy_surface
-from ridgefollowing.algorithms import modes, ridgefollower
+from ridgefollowing.algorithms import modes, cosine_follower
 
 # from ridgefollowing import ridgefollower
 from spirit_extras.plotting import Paper_Plot
@@ -157,6 +157,8 @@ class PlotSettings(BaseModel):
     plot_c2: Optional[ScalarPlotSettings] = None
     plot_evaldiff: Optional[ScalarPlotSettings] = None
     plot_c_grad_norm: Optional[ScalarPlotSettings] = None
+    plot_grad_norm: Optional[ScalarPlotSettings] = None
+
     plot_c2_mod: Optional[ScalarPlotSettings] = None
     plot_sum_c2: Optional[ScalarPlotSettings] = None
 
@@ -202,10 +204,11 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         mode = np.empty(shape=(*settings.npoints, surface.ndim))
         mode2 = np.empty(shape=(*settings.npoints, surface.ndim))
         gradient = np.empty(shape=(*settings.npoints, surface.ndim))
+        gradient_norm = np.empty(shape=settings.npoints)
         gradient_c = np.empty(shape=(*settings.npoints, surface.ndim))
         eigenvalues = np.empty(shape=(*settings.npoints, surface.ndim))
 
-        Rfollower = ridgefollower.RidgeFollower(surface)
+        Rfollower = cosine_follower.CosineFollower(surface)
 
         if not settings.output_data_folder is None:
             # assert settings.output_data_folder.is_dir()
@@ -232,8 +235,13 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                     mode2[yi, xi] = eigenvecs[:, 1]
                     eigenvalues[yi, xi] = eigenvals
 
-                if settings.plot_gradient or settings.plot_sum_c2:
+                if (
+                    settings.plot_gradient
+                    or settings.plot_sum_c2
+                    or settings.plot_grad_norm
+                ):
                     gradient[yi, xi] = surface.gradient([x, y])
+                    gradient_norm[yi, xi] = np.linalg.norm(gradient[yi, xi])
                     gradient[yi, xi] = gradient[yi, xi] / np.linalg.norm(
                         gradient[yi, xi]
                     )
@@ -270,6 +278,8 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
             sum_c2 = np.load(settings.input_data_folder / "sum_c2.npy")
         if (settings.input_data_folder / "gradient.npy").exists():
             gradient = np.load(settings.input_data_folder / "gradient.npy")
+        if (settings.input_data_folder / "gradient_norm.npy").exists():
+            gradient_norm = np.load(settings.input_data_folder / "gradient_norm.npy")
         if (settings.input_data_folder / "gradient_c.npy").exists():
             gradient_c = np.load(settings.input_data_folder / "gradient_c.npy")
         if (settings.input_data_folder / "eigenvalues.npy").exists():
@@ -288,8 +298,9 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
             np.save(settings.output_data_folder / "mode2", mode2)
             np.save(settings.output_data_folder / "sum_c2", sum_c2)
 
-        if settings.plot_gradient:
+        if settings.plot_gradient or settings.plot_grad_norm:
             np.save(settings.output_data_folder / "gradient", gradient)
+            np.save(settings.output_data_folder / "gradient_norm", gradient_norm)
 
         if settings.plot_c2 or settings.plot_gradient_c2:
             np.save(settings.output_data_folder / "c", c)
@@ -314,6 +325,9 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
 
     if settings.plot_c_grad_norm:
         settings.plot_c_grad_norm.plot(ax, X, Y, np.linalg.norm(gradient_c, axis=2))
+
+    if settings.plot_grad_norm:
+        settings.plot_grad_norm.plot(ax, X, Y, gradient_norm)
 
     if settings.plot_sum_c2:
         settings.plot_sum_c2.plot(ax, X, Y, sum_c2)
