@@ -1,12 +1,8 @@
 import abc
 from ridgefollowing import energy_surface
-from ridgefollowing.algorithms import modes, spherical_optimizer
 import numpy.typing as npt
 from typing import Optional, List, Union
-from pathlib import Path
 import numpy as np
-from scipy.optimize import minimize
-import numdifftools as nd
 
 
 class RidgeFollower(abc.ABC):
@@ -46,17 +42,17 @@ class RidgeFollower(abc.ABC):
                 prog = i / self.n_iterations_follow * 100
                 print(
                     f"Iteration {i} / {self.n_iterations_follow} ( {prog:.3f}% )",
-                    end="\r",
+                    end="\n",
                 )
 
             # Save old direction
             self._d_prev = self._d_cur
 
+            self._E = self.esurf.energy(self._x_cur)
+            self._G = self.esurf.gradient(self._x_cur)
+
             step = self.determine_step()
 
             self._x_cur += step
-
-            self._E = self.esurf.energy(self._x_cur)
-            self._G = self.esurf.gradient(self._x_cur)
 
             self.log_history()
