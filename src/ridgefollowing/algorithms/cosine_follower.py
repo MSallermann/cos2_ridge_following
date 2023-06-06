@@ -95,7 +95,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
         # grad = self.esurf.gradient(x) - g0 - h0@(x-x0)
 
         hessian = h0
-        hessian = self.esurf.hessian(x)
+        # hessian = self.esurf.hessian(x)
 
         grad = self.esurf.gradient(x)  # g0 + h0@(x-x0)
         grad = g0 + h0 @ (x - x0)

@@ -127,6 +127,7 @@ cm = Paper_Plot.cm
 class PlotSettings(BaseModel):
     class Config:
         arbitrary_types_allowed = True
+        validate_assignment = True
 
     outfile: Optional[str] = None  # Figure .png file
     output_data_folder: Optional[Path] = None  # folder to save computed data in
@@ -141,10 +142,8 @@ class PlotSettings(BaseModel):
     )
     dpi: float = 300
 
-    lims: npt.ArrayLike = np.array(
-        [[0, 1], [0, 1]]
-    )  # limits [[xmin, xmax], [ymin, ymax]
-    npoints: npt.ArrayLike = np.array(
+    lims: npt.NDArray = np.array([[0, 1], [0, 1]])  # limits [[xmin, xmax], [ymin, ymax]
+    npoints: npt.NDArray = np.array(
         [100, 100], dtype=np.int64
     )  # number of sample points [npointsx, npointsy]
 

@@ -16,7 +16,8 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
         mode_index: int = 0,
     ) -> None:
         super().__init__(energy_surface, n_iterations_follow)
-        self.mode_index = mode_index
+        if not mode_index is None:
+            self.mode_index = mode_index
         self.trust_radius = trust_radius
         self.v = np.zeros(self.esurf.ndim)
 

@@ -1,8 +1,8 @@
 import abc
 from ridgefollowing import energy_surface
 import numpy.typing as npt
-from typing import Optional, List, Union
 import numpy as np
+from pathlib import Path
 
 
 class RidgeFollower(abc.ABC):
@@ -31,6 +31,11 @@ class RidgeFollower(abc.ABC):
         self.history["d_cur"][self._iteration] = np.array(self._d_cur)
         self.history["E"][self._iteration] = self._E
         self.history["G"][self._iteration] = self._G
+
+    def dump_history(self, folder: Path):
+        folder.mkdir(exist_ok=True)
+        for k, v in self.history.items():
+            np.save(folder / k, v)
 
     def follow(self, x0: npt.NDArray, d0: npt.NDArray):
         self._x_cur = np.array(x0)

@@ -1,0 +1,8 @@
+x0 = [0.78346472, -0.62893589]
+d0 = [0.0, 1.0]
+
+n_follow=60
+type="cosine"
+outputfolder="out"
+radius=1e-2
+mode_index=0
