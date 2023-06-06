@@ -17,6 +17,12 @@ class CubicSurface(quadratic.QuadraticSurface):
 
         super().__init__(matrix, 2)
 
+    def scale_anharmonicity(self, factor):
+        self.f1 *= factor
+        self.f2 *= factor
+        self.c1 *= factor
+        self.c2 *= factor
+
     def disable_anharmonicity(self):
         self._f1 = self.f1
         self._f2 = self.f2
@@ -45,26 +51,20 @@ class CubicSurface(quadratic.QuadraticSurface):
     def gradient(self, x: npt.ArrayLike) -> npt.NDArray:
         g = super().gradient(x)
         g += self.f1 * np.array([2.0 * x[0] * x[1], x[0] ** 2])
-
         g += self.f2 * np.array(
             [
                 x[1] ** 2,
                 2.0 * x[1] * x[0],
             ]
         )
-
         g[0] += 3 * self.c1 * x[0] ** 2
         g[1] += 3 * self.c2 * x[1] ** 2
         return g
 
     def hessian(self, x: npt.ArrayLike) -> npt.NDArray:
         h = super().hessian(x)
-
         h += self.f1 * np.array([[2.0 * x[1], 2.0 * x[0]], [2.0 * x[0], 0.0]])
-
         h += self.f2 * np.array([[2.0 * x[1], 0.0], [2.0 * x[0], 2.0 * x[1]]])
-
         h[0, :] += 6.0 * self.c1 * x[0]
         h[1, :] += 6.0 * self.c2 * x[1]
-
         return h
