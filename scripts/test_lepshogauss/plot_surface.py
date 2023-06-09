@@ -20,7 +20,7 @@ settings = plot_surface.PlotSettings(
         colors="grey",
         colormap=None,
         log_compression=False,
-        zorder=999,
+        zorder=9,
     ),
     plot_grad_norm=plot_surface.ScalarPlotSettings(
         contourlevels=900,
@@ -41,11 +41,13 @@ def plot_walks(output_dir: Path, color):
     trajectory = np.load(output_dir / "x_cur.npy")
 
     settings.path_plots.append(
-        plot_surface.PathPlotSettings(points=trajectory, color=color)
+        plot_surface.PathPlotSettings(
+            points=trajectory, color=color, marker=".", zorder=10
+        )
     )
     settings.path_plots.append(
         plot_surface.PathPlotSettings(
-            points=np.array([trajectory[0]]), marker="o", color=color
+            points=np.array([trajectory[0]]), marker="o", color=color, zorder=10
         )
     )
 
@@ -74,7 +76,7 @@ def main(
         f = Calculation_Folder(p)
         plot_walks(Path(p) / f["outputfolder"], color=f"C{ip}")
 
-    settings.outfile = outfile
+    # settings.outfile = str(outfile)
     settings.show = show
 
     if not c2:

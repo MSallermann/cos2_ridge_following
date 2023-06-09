@@ -3,7 +3,7 @@ from ridgefollowing.algorithms import modes, cosine_follower
 
 # from ridgefollowing import ridgefollower
 from spirit_extras.plotting import Paper_Plot
-from typing import Optional, List
+from typing import Optional, List, Union
 from pydantic import BaseModel
 from pathlib import Path
 from dataclasses import dataclass
@@ -20,6 +20,7 @@ class PathPlotSettings(BaseModel):
     ls: str = "-"
     color: str = "black"
     marker: str = "None"
+    zorder: Optional[int] = 1
 
     def plot(self, ax):
         ax.plot(
@@ -28,6 +29,7 @@ class PathPlotSettings(BaseModel):
             ls=self.ls,
             color=self.color,
             marker=self.marker,
+            zorder=self.zorder,
         )
 
 
@@ -43,9 +45,10 @@ class ScalarPlotSettings(BaseModel):
     colormap: Optional[str] = "coolwarm"
     linestyles: Optional[str] = None
     colors: Optional[str] = None
-    contourlevels: int = 20
+    contourlevels: Union[int, List[float]] = 20
     vmax: Optional[float] = None
     vmin: Optional[float] = None
+    extend: Optional[str] = None
 
     zorder: int = 0
 
@@ -69,7 +72,7 @@ class ScalarPlotSettings(BaseModel):
                     X,
                     Y,
                     Z,
-                    extend="neither",
+                    extend=self.extend,
                     levels=self.contourlevels,
                     vmin=self.vmin,
                     vmax=self.vmax,

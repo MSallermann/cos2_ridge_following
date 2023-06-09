@@ -1,0 +1,8 @@
+x0 = [3.0012763798644935, -1.304342056715238]
+d0 = [-1.0, 0.0]
+
+n_follow=2000
+type="gradient_extremal"
+outputfolder="out"
+radius=1e-3
+mode_index=0
