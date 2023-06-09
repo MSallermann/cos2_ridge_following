@@ -20,20 +20,25 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
             self.mode_index = mode_index
 
         self.trust_radius_max = trust_radius
-        self.trust_region_tolerance = 1e-5
+        self.trust_radius_min = 1e-6
+        self.trust_region_tolerance = 1e-4
         self.trust_region_factor = 0.5
         self.prediction_ratio = 0
 
+        self.step_type_cur = 0
         self._trust_radius = trust_radius
 
         self.trust_region_applicability_kappa = 1e1
 
         self.v = np.zeros(self.esurf.ndim)
 
+    def setup_history(self):
+        super().setup_history()
         self.history.update(
             dict(
                 trust_radius=np.zeros(shape=(self.n_iterations_follow)),
                 prediction_ratio=np.zeros(shape=(self.n_iterations_follow)),
+                ridge_dist=np.zeros(shape=(self.n_iterations_follow)),
                 step_type=np.zeros(shape=(self.n_iterations_follow)),
                 x0=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
                 v=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
@@ -49,21 +54,10 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
         self.history["x0"][self._iteration] = self.x0
         self.history["v"][self._iteration] = self.v
         self.history["mode_index"][self._iteration] = self.mode_index
+        self.history["ridge_dist"][self._iteration] = self.ridge_dist
 
-    def update_trust_radius(self):
+    def update_trust_radius(self, x0, x1, G0, G1, E0, E1):
         """Evaluates how close to a quadratic energy prediction the previous step was and then updates the trust radius"""
-
-        if (
-            self._iteration < 2
-        ):  # If not enough data has been collected we dont't touch the trust_radius and return
-            return
-
-        E0 = self.history["E"][
-            self._iteration - 1
-        ]  # Energy at beginning of previous step
-        G0 = self.history["G"][self._iteration - 1]  # Gradient at end of previous step
-        E1 = self._E  # Energy at end of previous step
-        G1 = self._G  # Gradient at end of previous step
 
         numerical_epsilon = 1e-16
         applicable = (
@@ -76,7 +70,7 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
             return
 
         # previous step
-        delta = self._x_cur - self.history["x_cur"][self._iteration - 1]
+        delta = x1 - x0
         # Normalize to get direction
         step_length = np.linalg.norm(delta)
         delta /= step_length
@@ -84,7 +78,7 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
         # linear term
         a = np.dot(G0, delta)
         # quadratic term
-        b = 1 / (2.0 * step_length) * (np.dot(G1, delta) - a)
+        b = 1.0 / (2.0 * step_length) * (np.dot(G1, delta) - a)
 
         # Energy predicted by quadratic approximation
         E_predicted = E0 + a * step_length + b * step_length**2
@@ -93,6 +87,7 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
 
         if (
             self.prediction_ratio > self.trust_region_tolerance
+            and self._trust_radius * self.trust_region_factor >= self.trust_radius_min
         ):  # If above tolerance, decrease trust radius
             self._trust_radius *= self.trust_region_factor
         elif (
@@ -116,86 +111,167 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
 
         return avg
 
-    # def compute_approximate_ridge_location(x_cure)
-
-    def step_helper(self, x_cur, G, H, v):
-        x0 = x_cur - np.linalg.inv(H) @ G
+    def compute_approximate_ridge_location(self, x_cur, G, H, v):
+        """Compute the location of the ridge from a local quadratic approximation and returns
+        the location, the distance and the direction towards the ridge
+        """
+        x0 = -np.linalg.inv(H) @ G
         x0 = x0 - np.dot(x0, v) * v  # solution of the projected newton equation
 
-        self.x0 = x0
-        dir_extremal = x0 - x_cur
+        dir_extremal = x0
         dir_extremal = dir_extremal - np.dot(dir_extremal, v) * v
         dist_extremal = np.linalg.norm(dir_extremal)
 
-        if dist_extremal < self._trust_radius:
-            # Determine alpha such that '|x0 - x_cur + alpha * v| = self._trust_radius'
-            v2 = np.linalg.norm(v) ** 2
-            delta = x0 - x_cur
-            delta2 = np.linalg.norm(delta) ** 2
-            delta_v = np.dot(v, delta)
+        return x_cur + x0, dist_extremal, dir_extremal
 
-            # Quadratic equation
-            # 0 = v**2 * alpha*2 + 2*v*delta * alpha + delta**2 - r**2
-            alpha_p = -delta_v / v2
+    def compute_v(self, H, v_prev):
+        evals, evecs = modes.lowest_n_modes(H, n=2)
+        # Update index of current mode, via maximum overlap
+        overlaps = [
+            np.abs(np.dot(v_prev, evecs[:, i])) for i in range(len(evals))
+        ]  # Overlap with previous evec
+        mode_index = np.argmax(overlaps)
+        v = evecs[:, mode_index]
+        # Mode should point into one consistent direction
+        if np.dot(v_prev, v) < 0:
+            v *= -1
+        self.mode_index = mode_index
 
-            sqrt_part = np.sqrt(
-                (delta_v / v2) ** 2 - (delta2 - self._trust_radius**2) / v2
-            )  # Take branch with larger alpha value
-            if np.isnan(sqrt_part):
-                sqrt_part = 0.0
-            alpha_p += sqrt_part
+        return v
 
-            step = x0 + alpha_p * v - x_cur
-            self.step_type_cur = 0
+    def compute_quantities(self, x):
+        self._E = self.esurf.energy(x)
+        self._G = self.esurf.gradient(x)
+        self._H = self.esurf.hessian(x)
+        self.v = self.compute_v(self._H, self.dir_prev)
+
+    def move_towards_ridge(self):
+        (
+            self.x0,
+            self.ridge_dist,
+            self.ridge_dir,
+        ) = self.compute_approximate_ridge_location(
+            self._x_cur, self._G, self._H, self.v
+        )
+
+        if self.ridge_dist > self._trust_radius:
+            self.step_type_cur = 1
+            print(f"Lost ridge: ridge_dist = {self.ridge_dist}")
+            print(f"Lost ridge: x0 = {self.x0}")
+            print(f"Lost ridge: x = {self._x_cur}")
+            print(f"Lost ridge: v = {self.v}")
 
         else:
-            # Move towards extremal
-            move_dir = dir_extremal / dist_extremal
-            step = self._trust_radius * move_dir
-            self.step_type_cur = 1
+            self.step_type_cur = 0
+            return
+
+        while self.ridge_dist > self._trust_radius:
+            # Move towards ridge
+            step = self._trust_radius * self.ridge_dir / self.ridge_dist
+            self._x_cur += step
+
+            G_prev = self._G
+            E_prev = self._E
+
+            self.compute_quantities(self._x_cur)
+
+            (
+                self.x0,
+                self.ridge_dist,
+                self.ridge_dir,
+            ) = self.compute_approximate_ridge_location(
+                self._x_cur, self._G, self._H, self.v
+            )
+
+            self.update_trust_radius(
+                x0=self._x_cur - step,
+                x1=self._x_cur,
+                G0=G_prev,
+                G1=self._G,
+                E0=E_prev,
+                E1=self._E,
+            )
+
+        return self._x_cur
+
+    def step_along_ridge(self, x_cur, x0, v):
+        # Determine alpha such that '|x0 - x_cur + alpha * v| = self._trust_radius'
+        # Only works if the distance to the ridge is less than trust_radius
+
+        v2 = np.linalg.norm(v) ** 2
+        delta = x0 - x_cur
+        delta2 = np.linalg.norm(delta) ** 2
+        delta_v = np.dot(v, delta)
+
+        # Quadratic equation
+        # 0 = v**2 * alpha*2 + 2*v*delta * alpha + delta**2 - r**2
+        alpha_p = -delta_v / v2
+
+        sqrt_part = np.sqrt(
+            (delta_v / v2) ** 2 - (delta2 - self._trust_radius**2) / v2
+        )  # Take branch with larger alpha value
+        if np.isnan(sqrt_part):
+            sqrt_part = 0.0
+        alpha_p += sqrt_part
+
+        step = x0 + alpha_p * v - x_cur
 
         return step
 
     def determine_step(self):
-        self.update_trust_radius()
+        x_cur_save = self._x_cur.copy()
+
+        if (
+            self._iteration >= 2
+        ):  # If not enough data has been collected we dont't touch the trust_radius and return
+            E0 = self.history["E"][
+                self._iteration - 1
+            ]  # Energy at beginning of previous step
+            G0 = self.history["G"][
+                self._iteration - 1
+            ]  # Gradient at end of previous step
+            E1 = self._E  # Energy at end of previous step
+            G1 = self._G  # Gradient at end of previous step
+            x0 = self.history["x_cur"][self._iteration - 1]
+            x1 = self._x_cur
+            self.update_trust_radius(x0, x1, G0, G1, E0, E1)
 
         if self._iteration == 0:
-            dir_prev = (
+            self.dir_prev = (
                 self._d0
             )  # The initial value of _step_cur is d0 from the function call of self.follow()
-            self.v = dir_prev
+            self.v = self.dir_prev
         else:
-            dir_prev = self.rolling_average_direction(200)
+            self.dir_prev = self.v
 
-        self._H = self.esurf.hessian(self._x_cur)
-        evals, evecs = modes.lowest_n_modes(self._H, n=2)
+        self.compute_quantities(self._x_cur)
+        self.move_towards_ridge()
 
-        # Update index of current mode, via maximum overlap
-        overlaps = [np.abs(np.dot(self.v, evecs[:, i])) for i in range(len(evals))]
-        self.mode_index = np.argmax(overlaps)
-        self.v = evecs[:, self.mode_index]
-
-        # Mode should point into one consistent direction
-        if np.dot(dir_prev, self.v) < 0:
-            self.v *= -1
+        if self.step_type_cur == 1:
+            step = self._x_cur - x_cur_save
+            self._x_cur = x_cur_save
+            return step
 
         # Predictor step
-        step_pr = self.step_helper(self._x_cur, self._G, self._H, self.v)
+        step_pr = self.step_along_ridge(self._x_cur, self.x0, self.v)
 
         G_pr = self.esurf.gradient(self._x_cur + step_pr)
         H_pr = self.esurf.hessian(self._x_cur + step_pr)
-        evals_pr, evecs_pr = modes.lowest_n_modes(H_pr, n=2)
 
-        overlaps_pr = [
-            np.abs(np.dot(self.v, evecs_pr[:, i])) for i in range(len(evals_pr))
-        ]
-        mode_index_pr = np.argmax(overlaps_pr)
-        v_pr = evecs_pr[:, mode_index_pr]
+        G_final = 0.5 * (self._G + G_pr)
+        H_final = 0.5 * (self._H + H_pr)
 
-        # Mode should point into one consistent direction
-        if np.dot(dir_prev, v_pr) < 0:
-            v_pr *= -1
+        v_final = self.compute_v(H_final, self.dir_prev)
 
-        step_corrector = self.step_helper(self._x_cur + step_pr, G_pr, H_pr, v_pr)
+        # x0_corrector, _, _ = self.compute_approximate_ridge_location(
+        #     self._x_cur, G_final, H_final, v_final
+        # )
+        step_corrector = self.step_along_ridge(self._x_cur, self.x0, v_final)
 
-        return 0.5 * (step_pr + step_corrector)
+        # Do some cleanup since the parent class assumes that determine_step does not mess with x_cur
+        # step = self._x_cur + step_corrector - x_cur_save
+        step = self._x_cur + step_corrector - x_cur_save
+        self._x_cur = x_cur_save
+        # step = step_pr
+        # step = self._trust_radius * self.v
+        return step
