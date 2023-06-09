@@ -20,7 +20,7 @@ class CubicSurface(quadratic.QuadraticSurface):
         if example_idx == 2:
             # 1/2 * (xy + 2)*(y-x)
             self._hessian = np.zeros(shape=(2, 2))
-            self._gradient = np.array([-1, 1])
+            self._g0 = np.array([-1, 1])
             self.x2y = -0.5
             self.y2x = 0.5
             self.x3 = 0.0
@@ -28,7 +28,7 @@ class CubicSurface(quadratic.QuadraticSurface):
         elif example_idx == 3:
             # 1/2 * (xy - 2)*(y-x)
             self._hessian = np.zeros(shape=(2, 2))
-            self._gradient = np.array([1, -1])
+            self._g0 = np.array([1, -1])
             self.x2y = -0.5
             self.y2x = 0.5
             self.x3 = 0.0
@@ -43,7 +43,7 @@ class CubicSurface(quadratic.QuadraticSurface):
             self.x2y = -0.5
             self.x3 = 0.0
             self.y3 = 0.0
-            self._gradient = np.array([0.0, 1.0])
+            self._g0 = np.array([0.0, 1.0])
         else:
             raise ValueError("Invalid example index")
 
