@@ -30,7 +30,6 @@ class SphericalOptimization:
         ndim: int,
         tolerance: float = 1e-6,
         maxiter: Optional[int] = 1000,
-        maxiterls: Optional[int] = 10,
         assert_success: bool = True,
         disp: bool = False,
     ) -> None:
@@ -38,6 +37,7 @@ class SphericalOptimization:
         self.fun = fun
         self.grad = grad
         self.tolerance: float = tolerance
+        self.maxiter = maxiter
         self.x_embed = np.zeros(ndim)
         self.x_stereo = np.zeros(ndim - 1)
         self.pole: float = 1.0
@@ -109,8 +109,9 @@ class SphericalOptimization:
             method="L-BFGS-B",
             x0=self.embed_to_stereo(x0),
             jac=self.grad_stereo,
-            options=dict(disp=self.disp),
+            options=dict(disp=self.disp, maxiter=self.maxiter),
             callback=self.switch_pole_cb,
+            tol=self.tolerance
         )
 
         if self.assert_success:
