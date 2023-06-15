@@ -24,10 +24,14 @@ class CosineFollower(ridgefollower.RidgeFollower):
         self.radius: float = radius
 
         self.width_modified_gaussian: float = 1.0
-        self.magnitude_modified_gaussian: float = 1.0
+        self.magnitude_modified_gaussian: float = 0.0
 
         self.n_modes: int = 2
 
+        self.maximize = True
+
+    def setup_history(self):
+        super().setup_history()
         self.history.update(
             dict(
                 c2=np.zeros(shape=(self.n_iterations_follow)),
@@ -116,9 +120,11 @@ class CosineFollower(ridgefollower.RidgeFollower):
         """
         d0 /= np.linalg.norm(d0)
 
+        prefactor = -1.0 if self.maximize else 1.0
+
         def fun(d):
             """-C(x0 + radius*d)**2. Minus sign because we use scipy.minimize"""
-            return -self.C2_mod(x0 + self.radius * d)
+            return prefactor * self.C2_mod(x0 + self.radius * d)
 
         def grad(d):
             """gradient of C(x0 + radius * d) wrt to d. Minus sign because we use scipy.minimize"""
@@ -126,7 +132,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
             grad_c2_d = self.grad_C2_mod(x) * self.radius
             # project out component along d0
             grad_c2_d -= np.dot(grad_c2_d, d) * d
-            return -grad_c2_d
+            return prefactor * grad_c2_d
 
         opt = spherical_optimizer.SphericalOptimization(
             fun=fun,
@@ -138,7 +144,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
         )
         res = opt.minimize(d0)
 
-        return [res.x_opt, -res.f_opt, -res.g_opt]
+        return [res.x_opt, prefactor * res.f_opt, prefactor * res.g_opt]
 
     def sample_on_ring(self, x0: npt.NDArray, npoints=27, anharmonic: bool = False):
         """Sample C2 and the projection of grad_C2 on a ring
@@ -198,10 +204,10 @@ class CosineFollower(ridgefollower.RidgeFollower):
     def determine_step(self):
         # Find maximum on ring
         self._d_cur, self._c2, self._grad_c2 = self.find_maximum_on_ring(
-            self._x_cur, self._d_prev
+            self._x_cur, self._step_cur
         )
 
-        if np.dot(self._d_cur, self._d_prev) < 0:
+        if np.dot(self._d_cur, self._step_cur) < 0:
             print(f"Return detected at iteration {self._iteration}")
             print(f"x_cur = [{self._x_cur}]")
             print(modes.eigenpairs(self.esurf.hessian(self._x_cur)))
