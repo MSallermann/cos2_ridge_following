@@ -138,8 +138,8 @@ class CosineFollower(ridgefollower.RidgeFollower):
             fun=fun,
             grad=grad,
             ndim=self.esurf.ndim,
-            tolerance=self.tolerance,
-            assert_success=False,
+            tolerance=self.tolerance*self.radius,
+            assert_success=True,
             disp=False,
         )
         res = opt.minimize(d0)
@@ -200,6 +200,26 @@ class CosineFollower(ridgefollower.RidgeFollower):
 
         # Filter out duplicate maxima
         return maxima
+
+    def make_ring_sample_plot(self):
+        import matplotlib.pyplot as plt
+        path = self.output_path / Path(f"ring_plots/ring_iteration_{self._iteration}.png")
+        path.parent.mkdir(exist_ok=True, parents=True)
+        phi, c2, _, _ = self.sample_on_ring(self._x_cur, 128)
+
+        def get_phi_form_dir(d):
+            return (np.arctan2(d[1], d[0]) + 2*np.pi) % (2*np.pi) 
+
+        phi_prev = get_phi_form_dir(self._step_cur)
+
+        phi_cur = get_phi_form_dir(self._d_cur)
+
+        plt.plot(phi, c2)
+        plt.axvline(phi_cur, color="red")
+        plt.axvline(phi_prev, color="blue")
+        plt.savefig(path)
+        plt.close()
+
 
     def determine_step(self):
         # Find maximum on ring
