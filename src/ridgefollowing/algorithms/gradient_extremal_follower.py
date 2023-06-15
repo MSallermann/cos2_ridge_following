@@ -1,10 +1,6 @@
 from ridgefollowing import energy_surface
 from ridgefollowing.algorithms import ridgefollower, modes
-from typing import Optional, List, Union
-from pathlib import Path
 import numpy as np
-from scipy.optimize import minimize
-import numdifftools as nd
 
 
 class GradientExtremalFollower(ridgefollower.RidgeFollower):
@@ -20,7 +16,7 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
             self.mode_index = mode_index
 
         self.trust_radius_max = trust_radius
-        self.trust_radius_min = 1e-6
+        self.trust_radius_min = 1e-1
         self.trust_region_tolerance = 1e-4
         self.trust_region_factor = 0.5
         self.prediction_ratio = 0
@@ -42,6 +38,8 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
                 step_type=np.zeros(shape=(self.n_iterations_follow)),
                 x0=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
                 v=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
+                eval=np.zeros(shape=(self.n_iterations_follow)),
+                eval2=np.zeros(shape=(self.n_iterations_follow)),
                 mode_index=np.zeros(shape=(self.n_iterations_follow)),
             )
         )
@@ -53,6 +51,8 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
         self.history["step_type"][self._iteration] = self.step_type_cur
         self.history["x0"][self._iteration] = self.x0
         self.history["v"][self._iteration] = self.v
+        self.history["eval"][self._iteration] = self.cur_eval
+        self.history["eval2"][self._iteration] = self.cur_eval2
         self.history["mode_index"][self._iteration] = self.mode_index
         self.history["ridge_dist"][self._iteration] = self.ridge_dist
 
@@ -66,7 +66,8 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
 
         if not applicable:
             # We have to increase the trust radius
-            self._trust_radius /= self.trust_region_factor
+            if self._trust_radius / self.trust_region_factor <= self.trust_radius_max:
+                self._trust_radius /= self.trust_region_factor
             return
 
         # previous step
@@ -115,11 +116,11 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
         """Compute the location of the ridge from a local quadratic approximation and returns
         the location, the distance and the direction towards the ridge
         """
+
         x0 = -np.linalg.inv(H) @ G
         x0 = x0 - np.dot(x0, v) * v  # solution of the projected newton equation
 
         dir_extremal = x0
-        dir_extremal = dir_extremal - np.dot(dir_extremal, v) * v
         dist_extremal = np.linalg.norm(dir_extremal)
 
         return x_cur + x0, dist_extremal, dir_extremal
@@ -136,6 +137,9 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
         if np.dot(v_prev, v) < 0:
             v *= -1
         self.mode_index = mode_index
+
+        self.cur_eval = evals[mode_index]
+        self.cur_eval2 = evals[(mode_index + 1) % self.esurf.ndim]
 
         return v
 
@@ -263,10 +267,11 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
 
         v_final = self.compute_v(H_final, self.dir_prev)
 
-        # x0_corrector, _, _ = self.compute_approximate_ridge_location(
-        #     self._x_cur, G_final, H_final, v_final
-        # )
-        step_corrector = self.step_along_ridge(self._x_cur, self.x0, v_final)
+        x0_corrector, _, _ = self.compute_approximate_ridge_location(
+            self._x_cur, G_final, H_final, v_final
+        )
+
+        step_corrector = self.step_along_ridge(self._x_cur, x0_corrector, v_final)
 
         # Do some cleanup since the parent class assumes that determine_step does not mess with x_cur
         # step = self._x_cur + step_corrector - x_cur_save
