@@ -13,7 +13,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
         self,
         energy_surface: energy_surface.EnergySurface,
         maxiter: int = 1000,
-        tolerance: Optional[float] = 1e-4,
+        tolerance: Optional[float] = 1e-8,
         n_iterations_follow: int = 100,
         radius: float = 0.5e-2,
     ) -> None:
@@ -90,7 +90,12 @@ class CosineFollower(ridgefollower.RidgeFollower):
 
     def grad_C2_mod(self, x: npt.ArrayLike) -> npt.NDArray:
         """Computes the gradient of the modified C2 value"""
-        return nd.Gradient(self.C2_mod)(x)
+        grad, res = nd.Gradient(self.C2_mod, order=2, full_output=True)(x)
+
+        if np.max(res.error_estimate) > self.tolerance:
+            grad, res = nd.Gradient(self.C2_mod, order=4, full_output=True)(x)
+
+        return grad
 
     def C2_anharmonic(
         self, x0: npt.NDArray, g0: npt.NDArray, h0: npt.NDArray, x: npt.NDArray
@@ -118,6 +123,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
             d0 (npt.NDArray): initial guess for direction
             radius (float, optional): radius of ring. Defaults to 1.
         """
+
         d0 /= np.linalg.norm(d0)
 
         prefactor = -1.0 if self.maximize else 1.0
@@ -138,8 +144,9 @@ class CosineFollower(ridgefollower.RidgeFollower):
             fun=fun,
             grad=grad,
             ndim=self.esurf.ndim,
-            tolerance=self.tolerance*self.radius,
-            assert_success=True,
+            tolerance=self.tolerance * self.radius,
+            maxiter=10000,
+            assert_success=False,
             disp=False,
         )
         res = opt.minimize(d0)
@@ -201,25 +208,85 @@ class CosineFollower(ridgefollower.RidgeFollower):
         # Filter out duplicate maxima
         return maxima
 
-    def make_ring_sample_plot(self):
+    def make_ring_sample_plot(self, show=False, N_phi=128):
         import matplotlib.pyplot as plt
-        path = self.output_path / Path(f"ring_plots/ring_iteration_{self._iteration}.png")
+
+        path = self.output_path / Path(
+            f"ring_plots/ring_iteration_{self._iteration}.png"
+        )
         path.parent.mkdir(exist_ok=True, parents=True)
-        phi, c2, _, _ = self.sample_on_ring(self._x_cur, 128)
+        phi, c2, _, _ = self.sample_on_ring(self._x_cur, N_phi)
 
-        def get_phi_form_dir(d):
-            return (np.arctan2(d[1], d[0]) + 2*np.pi) % (2*np.pi) 
+        def get_phi_from_dir(d):
+            return (np.arctan2(d[1], d[0]) + 2 * np.pi) % (2 * np.pi)
 
-        phi_prev = get_phi_form_dir(self._step_cur)
+        phi_prev = get_phi_from_dir(self._step_cur)
 
-        phi_cur = get_phi_form_dir(self._d_cur)
+        phi_cur = get_phi_from_dir(self._d_cur)
 
         plt.plot(phi, c2)
-        plt.axvline(phi_cur, color="red")
-        plt.axvline(phi_prev, color="blue")
+        plt.axvline(phi_cur, color="red", label="opt")
+        plt.axvline(phi_prev, color="blue", label="init")
+        plt.legend()
         plt.savefig(path)
+        if show:
+            plt.show()
         plt.close()
 
+    def make_stereographic_sample_plot(
+        self, show=False, gradient=False, N_sample=128, x_range=[-3, 3]
+    ):
+        import matplotlib.pyplot as plt
+
+        assert self.esurf.ndim == 2
+
+        prefactor = -1.0 if self.maximize else 1.0
+        x0 = self._x_cur
+
+        def fun(d):
+            """-C(x0 + radius*d)**2. Minus sign because we use scipy.minimize"""
+            return prefactor * self.C2_mod(x0 + self.radius * d)
+
+        def grad(d):
+            """gradient of C(x0 + radius * d) wrt to d. Minus sign because we use scipy.minimize"""
+            x = x0 + self.radius * d
+            grad_c2_d = self.grad_C2_mod(x) * self.radius
+            # project out component along d0
+            grad_c2_d -= np.dot(grad_c2_d, d) * d
+            return prefactor * grad_c2_d
+
+        opt = spherical_optimizer.SphericalOptimization(
+            fun=fun,
+            grad=grad,
+            ndim=self.esurf.ndim,
+            tolerance=self.tolerance * self.radius,
+            maxiter=10000,
+            assert_success=False,
+            disp=False,
+        )
+
+        x_stereo = np.linspace(x_range[0], x_range[1], N_sample)
+        f_stereo = [opt.f_stereo(np.array([x])) for x in x_stereo]
+        g_stereo = [opt.grad_stereo(np.array([x])) for x in x_stereo]
+
+        x_stereo_prev = opt.embed_to_stereo(self._step_cur)
+        x_stereo_cur = opt.embed_to_stereo(self._d_cur)
+
+        path = self.output_path / Path(
+            f"stereo_plots/ring_iteration_{self._iteration}.png"
+        )
+        path.parent.mkdir(exist_ok=True, parents=True)
+
+        plt.plot(x_stereo, f_stereo, label="f")
+        if gradient:
+            plt.plot(x_stereo, g_stereo, label="g")
+        plt.axvline(x_stereo_cur, color="red", label="opt")
+        plt.axvline(x_stereo_prev, color="blue", label="init")
+        plt.legend()
+        plt.savefig(path)
+        if show:
+            plt.show()
+        plt.close()
 
     def determine_step(self):
         # Find maximum on ring

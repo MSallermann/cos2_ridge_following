@@ -1,5 +1,6 @@
-from ridgefollowing.algorithms import spherical_optimizer
-from ridgefollowing.surfaces import gaussians
+from ridgefollowing.algorithms import spherical_optimizer, cosine_follower
+from ridgefollowing.surfaces import gaussians, lepshogauss
+
 import numpy as np
 from numdifftools import Gradient
 
@@ -179,7 +180,59 @@ def test_ring_search():
     # plt.show()
 
 
+def test_lepshogauss_regression():
+    esurf = lepshogauss.LepsHOGaussSurface()
+    follower = cosine_follower.CosineFollower(
+        energy_surface=esurf, tolerance=1e-8, radius=1e-2
+    )
+
+    # x0 = [0.67595889, 4.2717716]
+    x0 = [0.6759588922580516, 4.271771599520583]
+    d0 = [-1.0, 0.0]
+
+    x0 = [0.67550265, 4.13177255]
+    d0 = [-0.00414767, -0.9999914]
+
+    d0 /= np.linalg.norm(d0)
+
+    prefactor = -1.0 if follower.maximize else 1.0
+
+    def fun(d):
+        """-C(x0 + radius*d)**2. Minus sign because we use scipy.minimize"""
+        return prefactor * follower.C2_mod(x0 + follower.radius * d)
+
+    # grad = Gradient(fun)
+
+    def grad(d):
+        """gradient of C(x0 + radius * d) wrt to d. Minus sign because we use scipy.minimize"""
+        x = x0 + follower.radius * d
+        grad_c2_d = follower.grad_C2_mod(x) * follower.radius
+        # project out component along d0
+        grad_c2_d -= np.dot(grad_c2_d, d) * d
+        return prefactor * grad_c2_d
+
+    opt = spherical_optimizer.SphericalOptimization(
+        fun=fun,
+        grad=grad,
+        ndim=follower.esurf.ndim,
+        tolerance=follower.tolerance * follower.radius,
+        maxiter=10000,
+        assert_success=True,
+        disp=False,
+    )
+
+    res = opt.minimize(d0)
+
+    follower._x_cur = x0
+    follower._iteration = 0
+    follower._step_cur = d0
+    follower._d_cur = res.x_opt
+
+    assert np.linalg.norm(res.g_opt_stero) < 1e-10
+
+
 if __name__ == "__main__":
     # test_spherical_optimizer()
     # test_pole()
-    test_ring_search()
+    # test_ring_search()
+    test_lepshogauss_regression()
