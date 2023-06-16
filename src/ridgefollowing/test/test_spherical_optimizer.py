@@ -16,7 +16,7 @@ def test_spherical_optimizer():
         return 2.0 * coeffs * x
 
     soptimizer = spherical_optimizer.SphericalOptimization(
-        fun, jac, ndim=ndim, assert_success=True
+        fun, jac, ndim=ndim, assert_success=True, tolerance=1e-24
     )
 
     for i in range(10):
@@ -46,7 +46,9 @@ def test_spherical_optimizer():
     x_opt_expected = np.zeros(ndim)
     x_opt_expected[5] = 1.0
 
-    assert np.allclose(res.x_opt, x_opt_expected, atol=1e-5)
+    print(x_opt_expected)
+    print(res.x_opt)
+    assert np.allclose(res.x_opt, x_opt_expected)
 
 
 def test_pole():
@@ -63,7 +65,7 @@ def test_pole():
     x_initial /= np.linalg.norm(x_initial)
 
     soptimizer = spherical_optimizer.SphericalOptimization(
-        fun, jac, ndim=ndim, assert_success=True, disp=False, tolerance=1e-7
+        fun, jac, ndim=ndim, assert_success=True, disp=False, tolerance=1e-12
     )
 
     soptimizer.pole = -1
@@ -85,7 +87,9 @@ def test_pole():
     x_opt_expected = np.zeros(ndim)
     x_opt_expected[-1] = 1.0
 
-    assert np.allclose(np.abs(res.x_opt), x_opt_expected, atol=1e-5)
+    print(res.x_opt)
+    print(x_opt_expected)
+    assert np.allclose(np.abs(res.x_opt), x_opt_expected)
     assert soptimizer.pole == -1  # Pole should have automatically switched
 
 
@@ -113,7 +117,6 @@ def test_ring_search():
         ndim=esurf.ndim,
         disp=False,
         maxiter=200,
-        maxiterls=20,
         assert_success=True,
         tolerance=1e-12,
     )
