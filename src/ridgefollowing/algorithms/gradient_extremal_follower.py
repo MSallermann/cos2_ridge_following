@@ -1,6 +1,7 @@
 from ridgefollowing import energy_surface
 from ridgefollowing.algorithms import ridgefollower, modes
 import numpy as np
+import numpy.typing as npt
 
 
 class GradientExtremalFollower(ridgefollower.RidgeFollower):
@@ -9,24 +10,24 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
         energy_surface: energy_surface.EnergySurface,
         n_iterations_follow: int = 100,
         trust_radius: float = 1e-5,
-        mode_index: int = 0,
     ) -> None:
         super().__init__(energy_surface, n_iterations_follow)
-        if not mode_index is None:
-            self.mode_index = mode_index
 
-        self.trust_radius_max = trust_radius
-        self.trust_radius_min = 1e-1
-        self.trust_region_tolerance = 1e-4
-        self.trust_region_factor = 0.5
-        self.prediction_ratio = 0
+        self.mode_index: npt.NDArray = np.zeros(self.esurf.ndim)
 
-        self.step_type_cur = 0
-        self._trust_radius = trust_radius
+        self.trust_radius_max: float = trust_radius
+        self.trust_radius_min: float = 1e-1
+        self.trust_region_tolerance: float = 1e-4
+        self.trust_region_factor: float = 0.5
+        self.prediction_ratio: float = 0.0
 
-        self.trust_region_applicability_kappa = 1e1
+        self.step_type_cur: int = 0
+        self._trust_radius: float = trust_radius
 
-        self.v = np.zeros(self.esurf.ndim)
+        self.trust_region_applicability_kappa: float = 1e1
+
+        self.v: npt.NDArray = np.zeros(self.esurf.ndim)
+        self._H: npt.NDArray = np.zeros((self.esurf.ndim, self.esurf.ndim))
 
     def setup_history(self):
         super().setup_history()
@@ -240,14 +241,6 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
             x1 = self._x_cur
             self.update_trust_radius(x0, x1, G0, G1, E0, E1)
 
-        if self._iteration == 0:
-            self.dir_prev = (
-                self._d0
-            )  # The initial value of _step_cur is d0 from the function call of self.follow()
-            self.v = self.dir_prev
-        else:
-            self.dir_prev = self.v
-
         self.compute_quantities(self._x_cur)
         self.move_towards_ridge()
 
@@ -265,7 +258,7 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
         G_final = 0.5 * (self._G + G_pr)
         H_final = 0.5 * (self._H + H_pr)
 
-        v_final = self.compute_v(H_final, self.dir_prev)
+        v_final = self.compute_v(H_final, self._step_prev)
 
         x0_corrector, _, _ = self.compute_approximate_ridge_location(
             self._x_cur, G_final, H_final, v_final

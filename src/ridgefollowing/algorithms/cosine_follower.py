@@ -90,10 +90,13 @@ class CosineFollower(ridgefollower.RidgeFollower):
 
     def grad_C2_mod(self, x: npt.ArrayLike) -> npt.NDArray:
         """Computes the gradient of the modified C2 value"""
-        grad, res = nd.Gradient(self.C2_mod, order=2, full_output=True)(x)
 
-        if np.max(res.error_estimate) > self.tolerance:
-            grad, res = nd.Gradient(self.C2_mod, order=4, full_output=True)(x)
+        order = 2
+        grad, res = nd.Gradient(self.C2_mod, order=order, full_output=True)(x)
+
+        while np.max(res.error_estimate) > self.tolerance and order <= 8:
+            order *= 2
+            grad, res = nd.Gradient(self.C2_mod, order=order, full_output=True)(x)
 
         return grad
 
@@ -136,8 +139,14 @@ class CosineFollower(ridgefollower.RidgeFollower):
             """gradient of C(x0 + radius * d) wrt to d. Minus sign because we use scipy.minimize"""
             x = x0 + self.radius * d
             grad_c2_d = self.grad_C2_mod(x) * self.radius
+
             # project out component along d0
+            g = self.esurf.gradient(x)
+            g /= np.linalg.norm(g)
+
             grad_c2_d -= np.dot(grad_c2_d, d) * d
+            # grad_c2_d -= np.dot(grad_c2_d, g) * g
+
             return prefactor * grad_c2_d
 
         opt = spherical_optimizer.SphericalOptimization(
@@ -291,13 +300,15 @@ class CosineFollower(ridgefollower.RidgeFollower):
     def determine_step(self):
         # Find maximum on ring
         self._d_cur, self._c2, self._grad_c2 = self.find_maximum_on_ring(
-            self._x_cur, self._step_cur
+            self._x_cur, self._step_prev
         )
 
-        if np.dot(self._d_cur, self._step_cur) < 0:
+        if np.dot(self._d_cur, self._step_prev) < 0:
             print(f"Return detected at iteration {self._iteration}")
             print(f"x_cur = [{self._x_cur}]")
             print(modes.eigenpairs(self.esurf.hessian(self._x_cur)))
+
+        # self.make_ring_sample_plot()
 
         return self.radius * self._d_cur
 
