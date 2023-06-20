@@ -22,7 +22,7 @@ settings = plot_surface.PlotSettings(
         log_compression=False,
         zorder=9,
     ),
-    plot_grad_norm=plot_surface.ScalarPlotSettings(
+    plot_grad_ext_crit=plot_surface.ScalarPlotSettings(
         contourlevels=900,
         log_compression=True,
         colormap="coolwarm",
@@ -42,12 +42,12 @@ def plot_walks(output_dir: Path, color):
 
     settings.path_plots.append(
         plot_surface.PathPlotSettings(
-            points=trajectory, color=color, marker=".", zorder=10
+            points=trajectory, color=color, marker=".", zorder=10, label_points=True
         )
     )
     settings.path_plots.append(
         plot_surface.PathPlotSettings(
-            points=np.array([trajectory[0]]), marker="o", color=color, zorder=10
+            points=np.array([trajectory[0]]), marker="x", color=color, zorder=10
         )
     )
 
@@ -59,6 +59,7 @@ def main(
     c2: bool,
     grad_norm: bool,
     data_folder: Optional[str],
+    regenerate_data: bool,
 ):
     if not data_folder is None:
         f = Calculation_Folder(data_folder, descriptor_file="meta.toml")
@@ -70,6 +71,8 @@ def main(
         print(Path(f))
         settings.output_data_folder = Path(f)
         settings.input_data_folder = Path(f)
+        if regenerate_data:
+            settings.input_data_folder = None
         settings.npoints = np.array(f["npoints"])
 
     for ip, p in enumerate(walk_dirs):
@@ -83,7 +86,7 @@ def main(
         settings.plot_c2 = None
 
     if not grad_norm:
-        settings.plot_grad_norm = None
+        settings.plot_grad_ext_crit = None
 
     plot_surface.plot(esurf, settings=settings)
 
@@ -97,8 +100,17 @@ if __name__ == "__main__":
     parser.add_argument("--show", action="store_true")
     parser.add_argument("--c2", action="store_true")
     parser.add_argument("--norm", action="store_true")
-    parser.add_argument("--datafolder", nargs=1, default="./data200")
+    parser.add_argument("--datafolder", default="./data200")
+    parser.add_argument("--regenerate_data", action="store_true")
 
     args = parser.parse_args()
 
-    main(args.walk_dirs, args.o, args.show, args.c2, args.norm, args.datafolder)
+    main(
+        args.walk_dirs,
+        args.o,
+        args.show,
+        args.c2,
+        args.norm,
+        args.datafolder,
+        args.regenerate_data,
+    )

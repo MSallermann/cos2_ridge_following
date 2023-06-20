@@ -1,5 +1,5 @@
 from ridgefollowing import energy_surface
-from ridgefollowing.algorithms import modes, cosine_follower
+from ridgefollowing.algorithms import modes, cosine_follower, gradient_extremal_follower
 
 # from ridgefollowing import ridgefollower
 from spirit_extras.plotting import Paper_Plot
@@ -19,8 +19,11 @@ class PathPlotSettings(BaseModel):
     points: npt.NDArray
     ls: str = "-"
     color: str = "black"
-    marker: str = "None"
+    marker: Optional[str] = None
+    mec: Optional[str] = None
     zorder: Optional[int] = 1
+
+    label_points: bool = False
 
     def plot(self, ax):
         ax.plot(
@@ -28,9 +31,14 @@ class PathPlotSettings(BaseModel):
             self.points[:, 1],
             ls=self.ls,
             color=self.color,
+            mec=self.mec,
             marker=self.marker,
             zorder=self.zorder,
         )
+
+        if self.label_points:
+            for i, p in enumerate(self.points):
+                ax.text(p[0], p[1], f"{i}")
 
 
 class ScalarPlotSettings(BaseModel):
@@ -116,7 +124,7 @@ class VectorPlotSettings(BaseModel):
                     U[:: self.sampling, :: self.sampling],
                     V[:: self.sampling, :: self.sampling],
                     color=self.color,
-                    label=self.label,
+                    # label=self.label,
                     zorder=self.zorder,
                     **self.kwargs,
                 )
@@ -158,6 +166,14 @@ class PlotSettings(BaseModel):
     plot_energy: Optional[ScalarPlotSettings] = None
     plot_c2: Optional[ScalarPlotSettings] = None
     plot_evaldiff: Optional[ScalarPlotSettings] = None
+    plot_eval1: Optional[ScalarPlotSettings] = None
+    plot_eval2: Optional[ScalarPlotSettings] = None
+
+    # distance to gradient extremal
+    plot_grad_ext_dist1: Optional[ScalarPlotSettings] = None
+    plot_grad_ext_dist2: Optional[ScalarPlotSettings] = None
+    plot_grad_ext_crit: Optional[ScalarPlotSettings] = None
+
     plot_c_grad_norm: Optional[ScalarPlotSettings] = None
     plot_grad_norm: Optional[ScalarPlotSettings] = None
 
@@ -210,7 +226,12 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         gradient_c = np.empty(shape=(*settings.npoints, surface.ndim))
         eigenvalues = np.empty(shape=(*settings.npoints, surface.ndim))
 
+        grad_ext_dist1 = np.empty(shape=settings.npoints)
+        grad_ext_dist2 = np.empty(shape=settings.npoints)
+        grad_ext_crit = np.empty(shape=settings.npoints)
+
         Rfollower = cosine_follower.CosineFollower(surface)
+        Gfollower = gradient_extremal_follower.GradientExtremalFollower(surface)
 
         if not settings.output_data_folder is None:
             # assert settings.output_data_folder.is_dir()
@@ -228,7 +249,12 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                     settings.plot_mode
                     or settings.plot_mode2
                     or settings.plot_evaldiff
+                    or settings.plot_eval1
+                    or settings.plot_eval2
                     or settings.plot_sum_c2
+                    or settings.plot_grad_ext_dist1
+                    or settings.plot_grad_ext_dist2
+                    or settings.plot_grad_ext_crit
                 ):
                     hessian = surface.hessian([x, y])
                     eigenvals, eigenvecs = modes.eigenpairs(hessian)
@@ -236,6 +262,37 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                     mode[yi, xi] = eigenvecs[:, 0]
                     mode2[yi, xi] = eigenvecs[:, 1]
                     eigenvalues[yi, xi] = eigenvals
+
+                    xcur = np.array([x, y])
+                    G = surface.gradient(xcur)
+
+                    mode[yi, xi] = eigenvecs[:, 0]
+                    mode2[yi, xi] = eigenvecs[:, 1]
+
+                    Gfollower.compute_v(hessian, v_prev=mode[yi, xi])
+                    (
+                        _,
+                        grad_ext_dist1[yi, xi],
+                        _,
+                    ) = Gfollower.compute_approximate_ridge_location(
+                        xcur, G, hessian, mode[yi, xi]
+                    )
+
+                    Gfollower.compute_v(hessian, v_prev=mode2[yi, xi])
+                    (
+                        _,
+                        grad_ext_dist2[yi, xi],
+                        _,
+                    ) = Gfollower.compute_approximate_ridge_location(
+                        xcur, G, hessian, mode2[yi, xi]
+                    )
+
+                    hg = hessian @ G
+                    hg_norm = hg / np.linalg.norm(hg)
+
+                    G_norm = G / np.linalg.norm(G)
+
+                    grad_ext_crit[yi, xi] = 1.0 - np.dot(hg_norm, G_norm) ** 2
 
                 if (
                     settings.plot_gradient
@@ -286,6 +343,12 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
             gradient_c = np.load(settings.input_data_folder / "gradient_c.npy")
         if (settings.input_data_folder / "eigenvalues.npy").exists():
             eigenvalues = np.load(settings.input_data_folder / "eigenvalues.npy")
+        if (settings.input_data_folder / "grad_ext_dist1.npy").exists():
+            grad_ext_dist1 = np.load(settings.input_data_folder / "grad_ext_dist1.npy")
+        if (settings.input_data_folder / "grad_ext_dist2.npy").exists():
+            grad_ext_dist2 = np.load(settings.input_data_folder / "grad_ext_dist2.npy")
+        if (settings.input_data_folder / "grad_ext_crit.npy").exists():
+            grad_ext_crit = np.load(settings.input_data_folder / "grad_ext_crit.npy")
 
     if not settings.output_data_folder is None:
         np.save(settings.output_data_folder / "X", X)
@@ -294,11 +357,24 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         if settings.plot_energy:
             np.save(settings.output_data_folder / "energy", energy)
 
-        if settings.plot_mode or settings.plot_evaldiff or settings.plot_sum_c2:
+        if (
+            settings.plot_mode
+            or settings.plot_mode2
+            or settings.plot_evaldiff
+            or settings.plot_sum_c2
+            or settings.plot_eval1
+            or settings.plot_eval2
+            or settings.plot_grad_ext_dist1
+            or settings.plot_grad_ext_dist2
+            or settings.plot_grad_ext_crit
+        ):
             np.save(settings.output_data_folder / "eigenvalues", eigenvalues)
             np.save(settings.output_data_folder / "mode", mode)
             np.save(settings.output_data_folder / "mode2", mode2)
             np.save(settings.output_data_folder / "sum_c2", sum_c2)
+            np.save(settings.output_data_folder / "grad_ext_dist1", grad_ext_dist1)
+            np.save(settings.output_data_folder / "grad_ext_dist2", grad_ext_dist2)
+            np.save(settings.output_data_folder / "grad_ext_crit", grad_ext_crit)
 
         if settings.plot_gradient or settings.plot_grad_norm:
             np.save(settings.output_data_folder / "gradient", gradient)
@@ -325,6 +401,12 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
             ax, X, Y, eigenvalues[:, :, 1] - eigenvalues[:, :, 0]
         )
 
+    if settings.plot_eval1:
+        settings.plot_eval1.plot(ax, X, Y, eigenvalues[:, :, 0])
+
+    if settings.plot_eval2:
+        settings.plot_eval2.plot(ax, X, Y, eigenvalues[:, :, 1])
+
     if settings.plot_c_grad_norm:
         settings.plot_c_grad_norm.plot(ax, X, Y, np.linalg.norm(gradient_c, axis=2))
 
@@ -333,6 +415,15 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
 
     if settings.plot_sum_c2:
         settings.plot_sum_c2.plot(ax, X, Y, sum_c2)
+
+    if settings.plot_grad_ext_dist1:
+        settings.plot_grad_ext_dist1.plot(ax, X, Y, grad_ext_dist1)
+
+    if settings.plot_grad_ext_dist2:
+        settings.plot_grad_ext_dist2.plot(ax, X, Y, grad_ext_dist2)
+
+    if settings.plot_grad_ext_crit:
+        settings.plot_grad_ext_crit.plot(ax, X, Y, grad_ext_crit)
 
     if settings.plot_mode:
         settings.plot_mode.plot(ax, X, Y, mode[:, :, 0], mode[:, :, 1])
