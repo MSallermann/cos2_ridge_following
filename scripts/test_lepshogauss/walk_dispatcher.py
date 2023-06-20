@@ -30,8 +30,6 @@ class WalkSettings(BaseModel):
 
     outputfolder: Path
 
-    mode_index: Optional[int]
-
     @validator("x0", "d0", pre=True)
     def convert_to_ndarray(cls, v) -> npt.NDArray:
         return np.array(v, dtype=float)
@@ -55,8 +53,7 @@ def main(input_folder):
         follower = gradient_extremal_follower.GradientExtremalFollower(
             energy_surface=esurf,
             trust_radius=settings.radius,
-            n_iterations_follow=settings.n_follow,
-            mode_index=settings.mode_index,
+            n_iterations_follow=settings.n_follow
         )
     elif settings.type == FollowerTypes.cosine:
         follower = cosine_follower.CosineFollower(
@@ -78,6 +75,8 @@ if __name__ == "__main__":
     parser.add_argument("paths", nargs="*")
 
     args = parser.parse_args()
+
+    # main(Path("/home/moritz/Coding/cos2_ridge_following/scripts/test_lepshogauss/walks/walk_1"))
 
     for p in args.paths:
         main(p)

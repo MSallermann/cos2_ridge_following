@@ -148,7 +148,7 @@ class GradientExtremalFollower(ridgefollower.RidgeFollower):
         self._E = self.esurf.energy(x)
         self._G = self.esurf.gradient(x)
         self._H = self.esurf.hessian(x)
-        self.v = self.compute_v(self._H, self.dir_prev)
+        self.v = self.compute_v(self._H, self._step_prev)
 
     def move_towards_ridge(self):
         (
