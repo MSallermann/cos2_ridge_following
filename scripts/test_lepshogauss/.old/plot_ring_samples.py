@@ -4,12 +4,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 points = [
-            np.array([1.006, -4.31109]),
-            # np.array([ 1.15154047, -0.99335039]),
-            # np.array([ 1.15154047, 0])
-            # np.array([1, 1]),
-            # np.array([1.0779186977342878, -3.415465753253382])
-          ]
+    np.array([1.006, -4.31109]),
+    # np.array([ 1.15154047, -0.99335039]),
+    # np.array([ 1.15154047, 0])
+    # np.array([1, 1]),
+    # np.array([1.0779186977342878, -3.415465753253382])
+]
 
 esurf = lepshogauss.LepsHOGaussSurface()
 # esurf = quadratic.QuadraticSurface( np.diag([1, 2]) )

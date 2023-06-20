@@ -7,21 +7,30 @@ from ridgefollowing.algorithms import minimizer
 esurf = lepshogauss.LepsHOGaussSurface()
 
 lims = np.array([[0.25, 3.5], [-5, 5]])
-folder = Path("./data200")
+folder = Path("./data400")
 
 settings = plot_surface.PlotSettings(
     width=15 * plot_surface.cm,
-    outfile="plot_energy.png",
+    outfile="plot_c2.png",
     lims=lims,
     plot_energy=plot_surface.ScalarPlotSettings(
+        contourlevels=40,
+        contours_filled=False,
+        contours=True,
+        colors="grey",
+        colormap=None,
+        log_compression=False,
+        zorder=9,
+    ),
+    plot_c2=plot_surface.ScalarPlotSettings(
         contourlevels=30,
-        log_compression=True,
+        log_compression=False,
         colormap="coolwarm",
         contours_filled=True,
     ),
     output_data_folder=folder,
-    input_data_folder=folder,
-    npoints=np.array([200, 200]),
+    # input_data_folder=folder,
+    npoints=np.array([400, 400]),
 )
 
 min = minimizer.Minimizer(energy_surface=esurf, tolerance=1e-7)

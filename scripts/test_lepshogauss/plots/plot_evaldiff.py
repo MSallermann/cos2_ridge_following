@@ -11,9 +11,18 @@ folder = Path("./data200")
 
 settings = plot_surface.PlotSettings(
     width=15 * plot_surface.cm,
-    outfile="plot_energy.png",
+    outfile="plot_evaldiff.png",
     lims=lims,
     plot_energy=plot_surface.ScalarPlotSettings(
+        contourlevels=40,
+        contours_filled=False,
+        contours=True,
+        colors="grey",
+        colormap=None,
+        log_compression=False,
+        zorder=999,
+    ),
+    plot_evaldiff=plot_surface.ScalarPlotSettings(
         contourlevels=30,
         log_compression=True,
         colormap="coolwarm",
@@ -24,19 +33,7 @@ settings = plot_surface.PlotSettings(
     npoints=np.array([200, 200]),
 )
 
-min = minimizer.Minimizer(energy_surface=esurf, tolerance=1e-7)
-x_min_1 = min.minimize_energy(np.array([0.5, 4.0]))
-x_min_2 = min.minimize_energy(np.array([1.0, -0.5]))
-x_min_3 = min.minimize_energy(np.array([3, -2.0]))
-
-for xm in [x_min_1, x_min_2, x_min_3]:
-    settings.path_plots.append(
-        plot_surface.PathPlotSettings(points=np.array([xm]), marker="o", color="black")
-    )
-
-np.set_printoptions(precision=16)
-print(x_min_1, esurf.energy(x_min_1), esurf.gradient(x_min_1))
-print(x_min_2, esurf.energy(x_min_2), esurf.gradient(x_min_2))
-print(x_min_3, esurf.energy(x_min_3), esurf.gradient(x_min_3))
+evalues = np.load(folder / "eigenvalues.npy")
+print(np.argmin(np.abs(evalues[:, :, 1] - evalues[:, :, 0])))
 
 plot_surface.plot(esurf, settings=settings)
