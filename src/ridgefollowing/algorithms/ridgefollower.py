@@ -31,6 +31,7 @@ class RidgeFollower(abc.ABC):
             step_cur=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
             E=np.zeros(shape=(self.n_iterations_follow)),
             G=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
+            G_norm=np.zeros(shape=(self.n_iterations_follow)),
         )
 
     def log_history(self):
@@ -38,6 +39,7 @@ class RidgeFollower(abc.ABC):
         self.history["step_cur"][self._iteration] = np.array(self._step_cur)
         self.history["E"][self._iteration] = self._E
         self.history["G"][self._iteration] = self._G
+        self.history["G_norm"][self._iteration] = np.linalg.norm(self._G)
 
     def dump_history(self, folder: Optional[Path] = None):
         if folder is None:
