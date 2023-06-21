@@ -25,8 +25,11 @@ class CosineFollower(ridgefollower.RidgeFollower):
 
         self.width_modified_gaussian: float = 1.0
         self.magnitude_modified_gaussian: float = 0.0
-
         self.n_modes: int = 2
+
+        self._ridge_width: float = 0.0
+
+        self.bifurcation_points = []
 
         self.maximize = True
 
@@ -37,6 +40,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
                 c2=np.zeros(shape=(self.n_iterations_follow)),
                 grad_c2=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
                 eval_diff=np.zeros(shape=(self.n_iterations_follow)),
+                ridge_width=np.zeros(shape=(self.n_iterations_follow)),
             )
         )
 
@@ -297,6 +301,28 @@ class CosineFollower(ridgefollower.RidgeFollower):
             plt.show()
         plt.close()
 
+    def compute_ridge_width(self, step):
+        assert (
+            self.esurf.ndim == 2
+        )  # This implementation only works for ndim=2, for higher dimensions the minimal width should be computed (??)
+
+        # Direction orthogonal to current search direction
+        orth_dir = np.array([-step[0], step[1]])
+        orth_dir /= np.linalg.norm(orth_dir)
+
+        def fun(a):
+            return self.C2_mod(self._x_cur + a * orth_dir)
+
+        order = 2
+        d, res = nd.Derivative(fun, n=2, full_output=True, order=order)(0.0)
+
+        while np.max(res.error_estimate) > self.tolerance and order <= 8:
+            order *= 2
+            d, res = nd.Derivative(fun, n=2, full_output=True, order=order)(0.0)
+
+        # self._ridge_width = 1.0/(1.0 - d)
+        self._ridge_width = d
+
     def determine_step(self):
         # Find maximum on ring
         self._d_cur, self._c2, self._grad_c2 = self.find_maximum_on_ring(
@@ -310,9 +336,29 @@ class CosineFollower(ridgefollower.RidgeFollower):
 
         # self.make_ring_sample_plot()
 
-        return self.radius * self._d_cur
+        step = self.radius * self._d_cur
+        self.compute_ridge_width(step)
+
+        if self._iteration > 3:
+            W_3 = self._ridge_width
+            W_2 = self.history["ridge_width"][self._iteration - 1]
+            W_1 = self.history["ridge_width"][self._iteration - 2]
+
+            E_3 = self._E
+            E_2 = self.history["E"][self._iteration - 1]
+            E_1 = self.history["E"][self._iteration - 2]
+
+            width_criterion = W_2 > W_3 and W_2 > W_1
+            energy_criterion = (E_3 > E_2 and E_2 > E_1) or (E_3 < E_2 and E_2 < E_1)
+
+            if width_criterion and energy_criterion:
+                print(f"Potential bifurcation at iteration {self._iteration-1}")
+                self.bifurcation_points.append([self._x_cur, self._step_cur])
+
+        return step
 
     def log_history(self):
         super().log_history()
         self.history["c2"][self._iteration] = self._c2
         self.history["grad_c2"][self._iteration] = self._grad_c2
+        self.history["ridge_width"][self._iteration] = self._ridge_width
