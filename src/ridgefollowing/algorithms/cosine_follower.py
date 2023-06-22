@@ -13,11 +13,12 @@ class CosineFollower(ridgefollower.RidgeFollower):
         self,
         energy_surface: energy_surface.EnergySurface,
         maxiter: int = 1000,
-        tolerance: Optional[float] = 1e-8,
+        output_path: Optional[Path] = None,
+        tolerance: Optional[float] = 1e-10,
         n_iterations_follow: int = 100,
         radius: float = 0.5e-2,
     ) -> None:
-        super().__init__(energy_surface, n_iterations_follow)
+        super().__init__(energy_surface, n_iterations_follow, output_path)
 
         self.tolerance: float = tolerance
         self.maxiter: int = maxiter
@@ -27,6 +28,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
         self.magnitude_modified_gaussian: float = 0.0
         self.n_modes: int = 2
 
+        self._d_cur = np.zeros(shape=(self.esurf.ndim))
         self._ridge_width: float = 0.0
 
         self.bifurcation_points = []
@@ -41,6 +43,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
                 grad_c2=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
                 eval_diff=np.zeros(shape=(self.n_iterations_follow)),
                 ridge_width=np.zeros(shape=(self.n_iterations_follow)),
+                c2_initial_guess_ratio=np.zeros(shape=(self.n_iterations_follow)),
             )
         )
 
@@ -92,17 +95,44 @@ class CosineFollower(ridgefollower.RidgeFollower):
             -0.5 / self.width_modified_gaussian**2 * (evals[1] - evals[0]) ** 2
         )
 
+    def adaptive_gradient(self, fun, x, tolerance, n=1):
+        order = 2
+        richardson_terms = 2
+        method = "central"
+
+        grad_f, res = nd.Gradient(
+            fun,
+            order=order,
+            method=method,
+            full_output=True,
+            richardson_terms=richardson_terms,
+            n=n,
+        )(x)
+        err_f = np.max(res.error_estimate)
+
+        while err_f > tolerance and order <= 8 and richardson_terms <= 8:
+            order *= 2
+            grad, res = nd.Gradient(
+                fun,
+                order=order,
+                method=method,
+                full_output=True,
+                richardson_terms=richardson_terms,
+                n=n,
+            )(x)
+            err = np.max(res.error_estimate)
+            if err < err_f:
+                grad_f = grad.copy()
+                err_f = err
+
+        if err_f > tolerance:
+            print(f"WARNING: current error is {err_f:.1e} > {tolerance}")
+
+        return grad_f
+
     def grad_C2_mod(self, x: npt.ArrayLike) -> npt.NDArray:
         """Computes the gradient of the modified C2 value"""
-
-        order = 2
-        grad, res = nd.Gradient(self.C2_mod, order=order, full_output=True)(x)
-
-        while np.max(res.error_estimate) > self.tolerance and order <= 8:
-            order *= 2
-            grad, res = nd.Gradient(self.C2_mod, order=order, full_output=True)(x)
-
-        return grad
+        return self.adaptive_gradient(self.C2_mod, x, self.tolerance * 1e-1)
 
     def C2_anharmonic(
         self, x0: npt.NDArray, g0: npt.NDArray, h0: npt.NDArray, x: npt.NDArray
@@ -166,7 +196,13 @@ class CosineFollower(ridgefollower.RidgeFollower):
 
         return [res.x_opt, prefactor * res.f_opt, prefactor * res.g_opt]
 
-    def sample_on_ring(self, x0: npt.NDArray, npoints=27, anharmonic: bool = False):
+    def sample_on_ring(
+        self,
+        x0: npt.NDArray,
+        npoints=27,
+        anharmonic: bool = False,
+        radial_factor: float = 1.0,
+    ):
         """Sample C2 and the projection of grad_C2 on a ring
 
         Args:
@@ -188,7 +224,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
             d = np.array([np.cos(p), np.sin(p)])
             dirs.append(d)
             d_orth = np.array([-d[1], d[0]])
-            x_cur = x0 + self.radius * d
+            x_cur = x0 + self.radius * radial_factor * d
 
             if anharmonic:
                 c2[ip] = self.C2_anharmonic(x0, g0, h0, x_cur)
@@ -221,14 +257,18 @@ class CosineFollower(ridgefollower.RidgeFollower):
         # Filter out duplicate maxima
         return maxima
 
-    def make_ring_sample_plot(self, show=False, N_phi=128):
+    def make_ring_sample_plot(self, show=False, N_phi=128, radial_factor=1.0):
         import matplotlib.pyplot as plt
 
-        path = self.output_path / Path(
-            f"ring_plots/ring_iteration_{self._iteration}.png"
+        if self.output_path is None:
+            raise Exception("Output path needs to be set")
+
+        folder = self.output_path / "ring_plots"
+        folder.mkdir(exist_ok=True)
+
+        phi, c2, _, _ = self.sample_on_ring(
+            x0=self._x_cur, npoints=N_phi, radial_factor=radial_factor
         )
-        path.parent.mkdir(exist_ok=True, parents=True)
-        phi, c2, _, _ = self.sample_on_ring(self._x_cur, N_phi)
 
         def get_phi_from_dir(d):
             return (np.arctan2(d[1], d[0]) + 2 * np.pi) % (2 * np.pi)
@@ -241,7 +281,9 @@ class CosineFollower(ridgefollower.RidgeFollower):
         plt.axvline(phi_cur, color="red", label="opt")
         plt.axvline(phi_prev, color="blue", label="init")
         plt.legend()
-        plt.savefig(path)
+        plt.savefig(
+            folder / f"iteration_{self._iteration}_r_factor_{radial_factor:.1f}.png"
+        )
         if show:
             plt.show()
         plt.close()
@@ -250,6 +292,12 @@ class CosineFollower(ridgefollower.RidgeFollower):
         self, show=False, gradient=False, N_sample=128, x_range=[-3, 3]
     ):
         import matplotlib.pyplot as plt
+
+        if self.output_path is None:
+            raise Exception("Output path needs to be set")
+
+        folder = self.output_path / "stereo_plots"
+        folder.mkdir(exist_ok=True)
 
         assert self.esurf.ndim == 2
 
@@ -282,13 +330,10 @@ class CosineFollower(ridgefollower.RidgeFollower):
         f_stereo = [opt.f_stereo(np.array([x])) for x in x_stereo]
         g_stereo = [opt.grad_stereo(np.array([x])) for x in x_stereo]
 
-        x_stereo_prev = opt.embed_to_stereo(self._step_cur)
-        x_stereo_cur = opt.embed_to_stereo(self._d_cur)
-
-        path = self.output_path / Path(
-            f"stereo_plots/ring_iteration_{self._iteration}.png"
+        x_stereo_prev = opt.embed_to_stereo(
+            self._step_cur / np.linalg.norm(self._step_cur)
         )
-        path.parent.mkdir(exist_ok=True, parents=True)
+        x_stereo_cur = opt.embed_to_stereo(self._d_cur)
 
         plt.plot(x_stereo, f_stereo, label="f")
         if gradient:
@@ -296,7 +341,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
         plt.axvline(x_stereo_cur, color="red", label="opt")
         plt.axvline(x_stereo_prev, color="blue", label="init")
         plt.legend()
-        plt.savefig(path)
+        plt.savefig(folder / f"iteration_{self._iteration}.png")
         if show:
             plt.show()
         plt.close()
@@ -311,30 +356,68 @@ class CosineFollower(ridgefollower.RidgeFollower):
         orth_dir /= np.linalg.norm(orth_dir)
 
         def fun(a):
-            return self.C2_mod(self._x_cur + a * orth_dir)
+            return self.C2_mod(self._x_cur + a[0] * orth_dir)
 
-        order = 2
-        d, res = nd.Derivative(fun, n=2, full_output=True, order=order)(0.0)
+        d = self.adaptive_gradient(fun, x=np.zeros(1), tolerance=self.tolerance, n=2)
 
-        while np.max(res.error_estimate) > self.tolerance and order <= 8:
-            order *= 2
-            d, res = nd.Derivative(fun, n=2, full_output=True, order=order)(0.0)
-
-        # self._ridge_width = 1.0/(1.0 - d)
         self._ridge_width = d
 
-    def determine_step(self):
-        # Find maximum on ring
-        self._d_cur, self._c2, self._grad_c2 = self.find_maximum_on_ring(
-            self._x_cur, self._step_prev
-        )
+    def feel_out_ridge(self, search_direction, n_factors=1):
+        """Try to 'feel' out a ridge in search_direction, by increasing the step size gradually"""
 
-        if np.dot(self._d_cur, self._step_prev) < 0:
+        radius_original = self.radius
+        success = False
+
+        factor_list = [2**i for i in range(n_factors)]
+
+        for f in factor_list:
+            print(f"f={f}")
+            self.radius = radius_original * f
+            # Find maximum on ring
+            self._d_cur, self._c2, self._grad_c2 = self.find_maximum_on_ring(
+                self._x_cur, search_direction
+            )
+
+            # Check the overlap
+            if not np.dot(self._d_cur, search_direction) < 1e-1:
+                success = True
+                break
+
+        self.radius = radius_original
+        return success
+
+    def determine_step(self):
+        dir_prev = self._step_prev / np.linalg.norm(self._step_prev)
+
+        success = self.feel_out_ridge(dir_prev, 5)
+
+        if not success:
             print(f"Return detected at iteration {self._iteration}")
             print(f"x_cur = [{self._x_cur}]")
+            print(self._x_cur)
             print(modes.eigenpairs(self.esurf.hessian(self._x_cur)))
+            print("Stopping")
+            self.make_ring_sample_plot()
+            self.make_stereographic_sample_plot()
+            self.stop()
 
-        # self.make_ring_sample_plot()
+        # self._d_cur, self._c2, self._grad_c2 = self.find_maximum_on_ring(
+        #     self._x_cur, self._step_prev
+        # )
+        # if np.dot(self._d_cur, self._step_prev) < 0:
+        #     print(f"Return detected at iteration {self._iteration}")
+        #     print(f"x_cur = [{self._x_cur}]")
+        #     print(modes.eigenpairs(self.esurf.hessian(self._x_cur)))
+        #     print("Stopping")
+        #     self.make_ring_sample_plot()
+        #     self.make_stereographic_sample_plot()
+        #     self.stop()
+
+        if self._iteration == 0:
+            self.make_ring_sample_plot(radial_factor=1.0)
+            self.make_ring_sample_plot(radial_factor=10.0)
+            self.make_ring_sample_plot(radial_factor=100.0)
+            self.make_stereographic_sample_plot()
 
         step = self.radius * self._d_cur
         self.compute_ridge_width(step)
@@ -344,16 +427,21 @@ class CosineFollower(ridgefollower.RidgeFollower):
             W_2 = self.history["ridge_width"][self._iteration - 1]
             W_1 = self.history["ridge_width"][self._iteration - 2]
 
-            E_3 = self._E
-            E_2 = self.history["E"][self._iteration - 1]
-            E_1 = self.history["E"][self._iteration - 2]
+            gradient_criterion = (
+                self.history["G_norm"][self._iteration - 1] > 1e-2
+            )  # Not a stationary point
 
             width_criterion = W_2 > W_3 and W_2 > W_1
-            energy_criterion = (E_3 > E_2 and E_2 > E_1) or (E_3 < E_2 and E_2 < E_1)
 
-            if width_criterion and energy_criterion:
+            if width_criterion and gradient_criterion:
                 print(f"Potential bifurcation at iteration {self._iteration-1}")
-                self.bifurcation_points.append([self._x_cur, self._step_cur])
+                x_bif = self.history["x_cur"][self._iteration - 1]
+                dir_bif = self.history["step_cur"][self._iteration - 1]
+                self.bifurcation_points.append(
+                    [x_bif, np.array([-dir_bif[1], dir_bif[0]])]
+                )
+                self.make_ring_sample_plot()
+                self.make_stereographic_sample_plot()
 
         return step
 
@@ -362,3 +450,6 @@ class CosineFollower(ridgefollower.RidgeFollower):
         self.history["c2"][self._iteration] = self._c2
         self.history["grad_c2"][self._iteration] = self._grad_c2
         self.history["ridge_width"][self._iteration] = self._ridge_width
+        self.history["c2_initial_guess_ratio"][self._iteration] = (
+            self.C2_mod(self._x_cur + self._step_cur) / self._c2
+        )
