@@ -219,11 +219,14 @@ class CosineFollower(ridgefollower.RidgeFollower):
         def grad(delta_x):
             grad_c2 = self.grad_C2_mod(x0 + delta_x - np.dot(delta_x, normal) * normal)
             # project out component along normal
-            grad_c2_ -= np.dot(grad_c2, normal) * normal
+            grad_c2 -= np.dot(grad_c2, normal) * normal
             return prefactor * grad_c2
 
-        res = minimize(fun=fun, x0=x0, jac=grad)
+        res = minimize(fun=fun, x0=np.zeros(self.esurf.ndim), jac=grad)
         delta_x = res.x
+
+        self._c2 = prefactor * res.fun
+        self._grad_c2 = prefactor * res.jac
 
         return delta_x
 
