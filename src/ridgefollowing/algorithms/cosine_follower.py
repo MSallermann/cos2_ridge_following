@@ -29,7 +29,14 @@ class CosineFollower(ridgefollower.RidgeFollower):
         self.n_modes: int = 2
 
         self._d_cur = np.zeros(shape=(self.esurf.ndim))
+        self._x_cur_temporary_save = np.zeros(shape=(self.esurf.ndim))
+
         self._ridge_width: float = 0.0
+        self._ridge_width_fw: float = 0.0
+        self._ridge_width_bw: float = 0.0
+
+        self._ridge_width3: float = 0.0
+        self._ridge_width4: float = 0.0
 
         self.bifurcation_points = []
 
@@ -43,6 +50,10 @@ class CosineFollower(ridgefollower.RidgeFollower):
                 grad_c2=np.zeros(shape=(self.n_iterations_follow, self.esurf.ndim)),
                 eval_diff=np.zeros(shape=(self.n_iterations_follow)),
                 ridge_width=np.zeros(shape=(self.n_iterations_follow)),
+                ridge_width_fw=np.zeros(shape=(self.n_iterations_follow)),
+                ridge_width_bw=np.zeros(shape=(self.n_iterations_follow)),
+                ridge_width3=np.zeros(shape=(self.n_iterations_follow)),
+                ridge_width4=np.zeros(shape=(self.n_iterations_follow)),
                 c2_initial_guess_ratio=np.zeros(shape=(self.n_iterations_follow)),
             )
         )
@@ -95,10 +106,9 @@ class CosineFollower(ridgefollower.RidgeFollower):
             -0.5 / self.width_modified_gaussian**2 * (evals[1] - evals[0]) ** 2
         )
 
-    def adaptive_gradient(self, fun, x, tolerance, n=1):
+    def adaptive_gradient(self, fun, x, tolerance, n=1, method="central"):
         order = 2
         richardson_terms = 2
-        method = "central"
 
         grad_f, res = nd.Gradient(
             fun,
@@ -132,7 +142,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
 
     def grad_C2_mod(self, x: npt.ArrayLike) -> npt.NDArray:
         """Computes the gradient of the modified C2 value"""
-        return self.adaptive_gradient(self.C2_mod, x, self.tolerance * 1e-1)
+        return self.adaptive_gradient(self.C2_mod, x, self.tolerance)
 
     def C2_anharmonic(
         self, x0: npt.NDArray, g0: npt.NDArray, h0: npt.NDArray, x: npt.NDArray
@@ -187,7 +197,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
             fun=fun,
             grad=grad,
             ndim=self.esurf.ndim,
-            tolerance=self.tolerance * self.radius,
+            tolerance=self.tolerance * self.radius * 1e-2,
             maxiter=10000,
             assert_success=False,
             disp=False,
@@ -195,6 +205,27 @@ class CosineFollower(ridgefollower.RidgeFollower):
         res = opt.minimize(d0)
 
         return [res.x_opt, prefactor * res.f_opt, prefactor * res.g_opt]
+
+    def find_maximum_on_hyperplane(self, x0: npt.NDArray, normal: npt.NDArray):
+        normal /= np.linalg.norm(normal)
+
+        prefactor = -1.0 if self.maximize else 1.0
+
+        def fun(delta_x):
+            return prefactor * self.C2_mod(
+                x0 + delta_x - np.dot(delta_x, normal) * normal
+            )
+
+        def grad(delta_x):
+            grad_c2 = self.grad_C2_mod(x0 + delta_x - np.dot(delta_x, normal) * normal)
+            # project out component along normal
+            grad_c2_ -= np.dot(grad_c2, normal) * normal
+            return prefactor * grad_c2
+
+        res = minimize(fun=fun, x0=x0, jac=grad)
+        delta_x = res.x
+
+        return delta_x
 
     def sample_on_ring(
         self,
@@ -358,9 +389,21 @@ class CosineFollower(ridgefollower.RidgeFollower):
         def fun(a):
             return self.C2_mod(self._x_cur + a[0] * orth_dir)
 
-        d = self.adaptive_gradient(fun, x=np.zeros(1), tolerance=self.tolerance, n=2)
-
-        self._ridge_width = d
+        self._ridge_width = self.adaptive_gradient(
+            fun, x=np.zeros(1), tolerance=self.tolerance, n=2
+        )
+        self._ridge_width_fw = self.adaptive_gradient(
+            fun, x=np.zeros(1), tolerance=self.tolerance, method="forward", n=2
+        )
+        self._ridge_width_bw = self.adaptive_gradient(
+            fun, x=np.zeros(1), tolerance=self.tolerance, method="backward", n=2
+        )
+        self._ridge_width3 = self.adaptive_gradient(
+            fun, x=np.zeros(1), tolerance=self.tolerance, n=3
+        )
+        self._ridge_width4 = self.adaptive_gradient(
+            fun, x=np.zeros(1), tolerance=self.tolerance, n=4
+        )
 
     def feel_out_ridge(self, search_direction, n_factors=1):
         """Try to 'feel' out a ridge in search_direction, by increasing the step size gradually"""
@@ -387,9 +430,11 @@ class CosineFollower(ridgefollower.RidgeFollower):
         return success
 
     def determine_step(self):
+        self._x_cur_temporary_save = self._x_cur.copy()
+
         dir_prev = self._step_prev / np.linalg.norm(self._step_prev)
 
-        success = self.feel_out_ridge(dir_prev, 5)
+        success = self.feel_out_ridge(dir_prev, 12)
 
         if not success:
             print(f"Return detected at iteration {self._iteration}")
@@ -397,27 +442,11 @@ class CosineFollower(ridgefollower.RidgeFollower):
             print(self._x_cur)
             print(modes.eigenpairs(self.esurf.hessian(self._x_cur)))
             print("Stopping")
-            self.make_ring_sample_plot()
+            for f in [1, 2, 4, 8, 16, 32, 64, 128]:
+                self.make_ring_sample_plot(radial_factor=float(f))
+
             self.make_stereographic_sample_plot()
             self.stop()
-
-        # self._d_cur, self._c2, self._grad_c2 = self.find_maximum_on_ring(
-        #     self._x_cur, self._step_prev
-        # )
-        # if np.dot(self._d_cur, self._step_prev) < 0:
-        #     print(f"Return detected at iteration {self._iteration}")
-        #     print(f"x_cur = [{self._x_cur}]")
-        #     print(modes.eigenpairs(self.esurf.hessian(self._x_cur)))
-        #     print("Stopping")
-        #     self.make_ring_sample_plot()
-        #     self.make_stereographic_sample_plot()
-        #     self.stop()
-
-        if self._iteration == 0:
-            self.make_ring_sample_plot(radial_factor=1.0)
-            self.make_ring_sample_plot(radial_factor=10.0)
-            self.make_ring_sample_plot(radial_factor=100.0)
-            self.make_stereographic_sample_plot()
 
         step = self.radius * self._d_cur
         self.compute_ridge_width(step)
@@ -450,6 +479,13 @@ class CosineFollower(ridgefollower.RidgeFollower):
         self.history["c2"][self._iteration] = self._c2
         self.history["grad_c2"][self._iteration] = self._grad_c2
         self.history["ridge_width"][self._iteration] = self._ridge_width
+        self.history["ridge_width_fw"][self._iteration] = self._ridge_width_fw
+        self.history["ridge_width_bw"][self._iteration] = self._ridge_width_bw
+        self.history["ridge_width3"][self._iteration] = self._ridge_width3
+        self.history["ridge_width4"][self._iteration] = self._ridge_width4
         self.history["c2_initial_guess_ratio"][self._iteration] = (
             self.C2_mod(self._x_cur + self._step_cur) / self._c2
         )
+
+        evals, evecs = modes.eigenpairs(self.esurf.hessian(self._x_cur))
+        self.history["eval_diff"][self._iteration] = evals[1] - evals[0]
