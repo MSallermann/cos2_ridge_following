@@ -135,8 +135,8 @@ class CosineFollower(ridgefollower.RidgeFollower):
                 grad_f = grad.copy()
                 err_f = err
 
-        if err_f > tolerance:
-            print(f"WARNING: current error is {err_f:.1e} > {tolerance}")
+        # if err_f > tolerance:
+        # print(f"WARNING: current error is {err_f:.1e} > {tolerance}")
 
         return grad_f
 
@@ -206,7 +206,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
 
         return [res.x_opt, prefactor * res.f_opt, prefactor * res.g_opt]
 
-    def find_maximum_on_hyperplane(self, x0: npt.NDArray, normal: npt.NDArray):
+    def find_maximum_on_hyperplane(self, x0: npt.NDArray, normal: npt.NDArray, max_dist : float):
         normal /= np.linalg.norm(normal)
 
         prefactor = -1.0 if self.maximize else 1.0
@@ -222,11 +222,16 @@ class CosineFollower(ridgefollower.RidgeFollower):
             grad_c2 -= np.dot(grad_c2, normal) * normal
             return prefactor * grad_c2
 
-        res = minimize(fun=fun, x0=np.zeros(self.esurf.ndim), jac=grad)
+        res = minimize(fun=fun, x0=np.zeros(self.esurf.ndim), jac=grad, method="CG")
         delta_x = res.x
 
         self._c2 = prefactor * res.fun
         self._grad_c2 = prefactor * res.jac
+
+        n_delta_x = np.linalg.norm(delta_x)
+
+        if n_delta_x > max_dist:
+            delta_x = delta_x * max_dist / n_delta_x
 
         return delta_x
 
@@ -390,25 +395,30 @@ class CosineFollower(ridgefollower.RidgeFollower):
         orth_dir /= np.linalg.norm(orth_dir)
 
         def fun(a):
+            a = np.atleast_1d(a)
             return self.C2_mod(self._x_cur + a[0] * orth_dir)
 
         self._ridge_width = self.adaptive_gradient(
             fun, x=np.zeros(1), tolerance=self.tolerance, n=2
         )
-        self._ridge_width_fw = self.adaptive_gradient(
-            fun, x=np.zeros(1), tolerance=self.tolerance, method="forward", n=2
-        )
-        self._ridge_width_bw = self.adaptive_gradient(
-            fun, x=np.zeros(1), tolerance=self.tolerance, method="backward", n=2
-        )
-        self._ridge_width3 = self.adaptive_gradient(
-            fun, x=np.zeros(1), tolerance=self.tolerance, n=3
-        )
-        self._ridge_width4 = self.adaptive_gradient(
-            fun, x=np.zeros(1), tolerance=self.tolerance, n=4
-        )
 
-    def feel_out_ridge(self, search_direction, n_factors=1):
+        C2p = fun(self.radius)
+        C20 = fun(0)
+        C2m = fun(-self.radius)
+
+        print(orth_dir)
+        self._ridge_width_fw = (C2p - C20) / self.radius
+
+        self._ridge_width_bw = (C2m - C20) / self.radius
+
+        # self._ridge_width_fw = self.adaptive_gradient(
+        #     fun, x=np.zeros(1), tolerance=self.tolerance, method="forward", n=2
+        # )
+        # self._ridge_width_bw = self.adaptive_gradient(
+        #     fun, x=np.zeros(1), tolerance=self.tolerance, method="backward", n=2
+        # )
+
+    def feel_out_ridge(self, x0, search_direction, n_factors=1):
         """Try to 'feel' out a ridge in search_direction, by increasing the step size gradually"""
 
         radius_original = self.radius
@@ -421,38 +431,79 @@ class CosineFollower(ridgefollower.RidgeFollower):
             self.radius = radius_original * f
             # Find maximum on ring
             self._d_cur, self._c2, self._grad_c2 = self.find_maximum_on_ring(
-                self._x_cur, search_direction
+                x0, search_direction
             )
 
             # Check the overlap
-            if not np.dot(self._d_cur, search_direction) < 1e-1:
+            if not np.dot(self._d_cur, search_direction) < 0.1:
                 success = True
                 break
 
         self.radius = radius_original
         return success
 
+    def get_dir_with_max_verlap(self, v0, s):
+        if np.dot(v0, s) < 0:
+            return -s
+        else:
+            return s
+
+    def locate_ridge(self, x0, search_direction, n_factors):
+        """Try to locate a ridge starting from x0 in direction"""
+
+        factor_list = [2**i for i in range(n_factors)]
+
+        # First we try to locate a tangent
+        success = self.feel_out_ridge(x0, search_direction, n_factors)
+
+        if success:
+            return self.radius * self._d_cur
+        else:
+            for f in factor_list:
+                delta_x = self.find_maximum_on_hyperplane(
+                    x0 + f * self.radius * search_direction, normal=search_direction, max_dist=10*self.radius*f
+                )
+                l = self.get_dir_with_max_verlap(v0=search_direction, s=self.grad_C2_mod(x0 + delta_x) )
+                success = self.feel_out_ridge(x0 + delta_x, search_direction=l, n_factors=n_factors)
+                if success:
+                    break
+            if not success:
+                print(f"Cannot locate ridge at iteration {self._iteration}")
+                print(f"x_cur = [{self._x_cur}]")
+                print("Stopping")
+                self.stop()
+            return self.radius * self._d_cur + delta_x
+
     def determine_step(self):
         self._x_cur_temporary_save = self._x_cur.copy()
-
         dir_prev = self._step_prev / np.linalg.norm(self._step_prev)
 
-        success = self.feel_out_ridge(dir_prev, 12)
+        if self._iteration == 0:
+            self.bifurcation_points.clear()
 
-        if not success:
-            print(f"Return detected at iteration {self._iteration}")
-            print(f"x_cur = [{self._x_cur}]")
-            print(self._x_cur)
-            print(modes.eigenpairs(self.esurf.hessian(self._x_cur)))
-            print("Stopping")
-            for f in [1, 2, 4, 8, 16, 32, 64, 128]:
-                self.make_ring_sample_plot(radial_factor=float(f))
+        step = self.locate_ridge(self._x_cur, dir_prev, n_factors=5)
 
-            self.make_stereographic_sample_plot()
-            self.stop()
+        # success = self.feel_out_ridge(x0=self._x_cur, search_direction=dir_prev, n_factors=1)
+        # step = self.radius * self._d_cur
 
-        step = self.radius * self._d_cur
-        self.compute_ridge_width(step)
+        # normal = self._d_cur
+        # normal = dir_prev
+        # delta_x = self.find_maximum_on_hyperplane(self._x_cur + self.radius*normal, normal=normal)
+        # step = self.radius*normal + delta_x
+
+        # if not success:
+        #     print(f"Return detected at iteration {self._iteration}")
+        #     print(f"x_cur = [{self._x_cur}]")
+        #     print(self._x_cur)
+        #     print(modes.eigenpairs(self.esurf.hessian(self._x_cur)))
+        #     print("Stopping")
+        #     for f in [1, 2, 4, 8, 16, 32, 64, 128]:
+        #         self.make_ring_sample_plot(radial_factor=float(f))
+
+        #     self.make_stereographic_sample_plot()
+        #     self.stop()
+
+        self.compute_ridge_width(dir_prev)
 
         if self._iteration > 3:
             W_3 = self._ridge_width
@@ -465,15 +516,40 @@ class CosineFollower(ridgefollower.RidgeFollower):
 
             width_criterion = W_2 > W_3 and W_2 > W_1
 
-            if width_criterion and gradient_criterion:
+            c2_critical = 1.0 - 1e-5
+
+            dir_cur = step / np.linalg.norm(step)
+            angle_criterion = np.dot(dir_prev, dir_cur) < 0.25
+
+            main_ridge_to_side_ridge = (
+                self.history["c2"][self._iteration - 1] > c2_critical
+                and self._c2 <= c2_critical
+            )
+            side_ridge_to_main_ridge = (
+                self.history["c2"][self._iteration - 1] < c2_critical
+                and self._c2 >= c2_critical
+            )
+
+            if (
+                (width_criterion and gradient_criterion)
+                or angle_criterion
+                or main_ridge_to_side_ridge
+                or side_ridge_to_main_ridge
+            ):
                 print(f"Potential bifurcation at iteration {self._iteration-1}")
                 x_bif = self.history["x_cur"][self._iteration - 1]
-                dir_bif = self.history["step_cur"][self._iteration - 1]
+
+                if angle_criterion:
+                    dir_bif = dir_cur
+                else:
+                    dir_bif = self.history["step_cur"][self._iteration - 1]
+
                 self.bifurcation_points.append(
                     [x_bif, np.array([-dir_bif[1], dir_bif[0]])]
                 )
-                self.make_ring_sample_plot()
-                self.make_stereographic_sample_plot()
+
+                # self.make_ring_sample_plot()
+                # self.make_stereographic_sample_plot()
 
         return step
 
