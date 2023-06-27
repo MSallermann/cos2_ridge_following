@@ -37,12 +37,12 @@ settings = plot_surface.PlotSettings(
 )
 
 
-def plot_walks(output_dir: Path, color):
+def plot_walks(output_dir: Path, color, label : bool):
     trajectory = np.load(output_dir / "x_cur.npy")
 
     settings.path_plots.append(
         plot_surface.PathPlotSettings(
-            points=trajectory, color=color, marker=".", zorder=10, label_points=True
+            points=trajectory, color=color, marker="o", zorder=10, label_points=label
         )
     )
     settings.path_plots.append(
@@ -60,6 +60,7 @@ def main(
     grad_norm: bool,
     data_folder: Optional[str],
     regenerate_data: bool,
+    label_points : bool = False
 ):
     if not data_folder is None:
         f = Calculation_Folder(data_folder, descriptor_file="meta.toml")
@@ -77,7 +78,7 @@ def main(
 
     for ip, p in enumerate(walk_dirs):
         f = Calculation_Folder(p)
-        plot_walks(Path(p) / f["outputfolder"], color=f"C{ip}")
+        plot_walks(Path(p) / "history", color=f"C{ip}", label=label_points)
 
     # settings.outfile = str(outfile)
     settings.show = show
@@ -102,6 +103,8 @@ if __name__ == "__main__":
     parser.add_argument("--norm", action="store_true")
     parser.add_argument("--datafolder", default="./data200")
     parser.add_argument("--regenerate_data", action="store_true")
+    parser.add_argument("--label", action="store_true")
+
 
     args = parser.parse_args()
 
@@ -113,4 +116,5 @@ if __name__ == "__main__":
         args.norm,
         args.datafolder,
         args.regenerate_data,
+        args.label
     )
