@@ -23,6 +23,9 @@ class PathPlotSettings(BaseModel):
     mec: Optional[str] = None
     zorder: Optional[int] = 1
 
+    lw: Optional[float] = None
+    kwargs: dict = dict()
+
     label_points: bool = False
 
     def plot(self, ax):
@@ -30,10 +33,12 @@ class PathPlotSettings(BaseModel):
             self.points[:, 0],
             self.points[:, 1],
             ls=self.ls,
+            lw=self.lw,
             color=self.color,
             mec=self.mec,
             marker=self.marker,
             zorder=self.zorder,
+            **self.kwargs,
         )
 
         if self.label_points:
@@ -47,6 +52,8 @@ class ScalarPlotSettings(BaseModel):
 
     contours: bool = False
     contours_filled: bool = True
+
+    flip_sign: bool = False
 
     log_compression: bool = True
 
@@ -74,6 +81,11 @@ class ScalarPlotSettings(BaseModel):
                 Zmax = np.max(Z)
                 Z = 0.001 + (Z - Zmin) / (Zmax - Zmin)
                 Z = np.log(Z)
+            elif self.flip_sign:
+                Z *= -1.0
+
+            if self.vmax:
+                Z = np.max(Z)
 
             return_vals.append(
                 f(
@@ -200,6 +212,8 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
 
     if ax is None:
         pplot = Paper_Plot(width=settings.width)
+
+        # data_aspect_ratio = (settings.lims[0][1] - settings.lims[0][0]) / (settings.lims[1][1] - settings.lims[1][0])
         pplot.apply_absolute_margins(
             aspect_ratio=1,
             abs_horizontal_margins=settings.abs_horizontal_margins,
@@ -269,30 +283,38 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                     mode[yi, xi] = eigenvecs[:, 0]
                     mode2[yi, xi] = eigenvecs[:, 1]
 
-                    Gfollower.compute_v(hessian, v_prev=mode[yi, xi])
-                    (
-                        _,
-                        grad_ext_dist1[yi, xi],
-                        _,
-                    ) = Gfollower.compute_approximate_ridge_location(
-                        xcur, G, hessian, mode[yi, xi]
-                    )
-
-                    Gfollower.compute_v(hessian, v_prev=mode2[yi, xi])
-                    (
-                        _,
-                        grad_ext_dist2[yi, xi],
-                        _,
-                    ) = Gfollower.compute_approximate_ridge_location(
-                        xcur, G, hessian, mode2[yi, xi]
-                    )
-
                     hg = hessian @ G
                     hg_norm = hg / np.linalg.norm(hg)
 
                     G_norm = G / np.linalg.norm(G)
 
-                    grad_ext_crit[yi, xi] = 1.0 - np.dot(hg_norm, G_norm) ** 2
+                    grad_ext_crit[yi, xi] = np.dot(hg_norm, G_norm) ** 2
+
+                    grad_ext_dist1[yi, xi] = 1.0 - np.dot(mode[yi, xi], G_norm) ** 2
+
+                    grad_ext_dist2[yi, xi] = (
+                        eigenvals[0] - np.dot(hg, G) / np.linalg.norm(G) ** 2
+                    ) ** 2
+
+                    # grad_ext_dist2[yi, xi] = 1.0 - np.dot(mode2[yi, xi], G_norm)**2
+
+                    Gfollower.compute_v(hessian, v_prev=mode[yi, xi])
+                    # (
+                    #     _,
+                    #     grad_ext_dist2[yi, xi],
+                    #     _,
+                    # ) = Gfollower.compute_approximate_ridge_location(
+                    #     xcur, G, hessian, mode[yi, xi]
+                    # )
+
+                    # Gfollower.compute_v(hessian, v_prev=mode2[yi, xi])
+                    # (
+                    #     _,
+                    #     grad_ext_dist2[yi, xi],
+                    #     _,
+                    # ) = Gfollower.compute_approximate_ridge_location(
+                    #     xcur, G, hessian, mode2[yi, xi]
+                    # )
 
                 if (
                     settings.plot_gradient
