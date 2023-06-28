@@ -3,6 +3,7 @@ from ridgefollowing import energy_surface
 from typing import Optional
 import numpy.typing as npt
 import numpy as np
+import time
 from pathlib import Path
 
 
@@ -27,6 +28,11 @@ class RidgeFollower(abc.ABC):
         self._E: float = 0.0
 
         self.__stop = False
+
+        self.t_start = 0.0
+        self.t_end = 0.0
+        self.t_cur = 0.0
+        self.t_cur_prev = 0.0
 
     def setup_history(self):
         self.history: dict = dict(
@@ -82,7 +88,16 @@ class RidgeFollower(abc.ABC):
     def determine_step(self):
         ...
 
+    def measure_iteration_time(self):
+        self.t_cur_prev = self.t_cur
+        self.t_cur = time.perf_counter()
+
+        delta_t = self.t_cur - self.t_cur_prev
+        return delta_t
+
     def follow(self, x0: npt.NDArray, d0: npt.NDArray):
+        self.t_start = time.perf_counter()
+
         d0 /= np.linalg.norm(d0)
 
         self.setup_history()
@@ -94,10 +109,11 @@ class RidgeFollower(abc.ABC):
 
         for i in range(self.n_iterations_follow):
             self._iteration = i
+
             if self.print_progress:
                 prog = (i + 1) / self.n_iterations_follow * 100
                 print(
-                    f"Iteration {i} / {self.n_iterations_follow} ( {prog:.3f}% )",
+                    f"Iteration {i} / {self.n_iterations_follow} ( {prog:.3f}% ) ... Delta t = {self.measure_iteration_time():.4f} s",
                     end="\n",
                 )
 
@@ -113,3 +129,11 @@ class RidgeFollower(abc.ABC):
 
             if self.__stop:
                 break
+
+        self.t_end = time.perf_counter()
+        if self.print_progress:
+            print(30 * "-")
+            print(
+                f"Run ended: time = {self.t_end - self.t_start:.2f} s, iterations = {self._iteration}, IPS = {self._iteration / (self.t_end - self.t_start):.2f}"
+            )
+            print(30 * "=")
