@@ -9,11 +9,11 @@ class LepsHOSurface(leps.LepsSurface):
     """
 
     def __init__(self):
-        super().__init__()
         self.kc = 0.2025
         # self.kc = 0.0
         self.c_ho = 1.154
         self.rAC = 3.742
+        super().__init__()
 
     def energy_harm(self, x: npt.ArrayLike) -> float:
         return 2.0 * self.kc * (x[0] - (self.rAC / 2.0 - x[1] / self.c_ho)) ** 2
@@ -38,13 +38,17 @@ class LepsHOSurface(leps.LepsSurface):
         rAB = x[0]
         chi = x[1]
 
-        return self.V_LEPS(rAB, self.rAC - rAB, self.rAC) + self.energy_harm(x)
+        return leps.LepsSurface.V_LEPS(
+            rAB, self.rAC - rAB, self.rAC, self.helper
+        ) + self.energy_harm(x)
 
     def gradient(self, x: npt.ArrayLike) -> npt.NDArray:
         rAB = x[0]
 
         grad = np.zeros(2)
-        grad_leps = self.gradient_V_LEPS(rAB, self.rAC - rAB, self.rAC)
+        grad_leps = leps.LepsSurface.gradient_V_LEPS(
+            rAB, self.rAC - rAB, self.rAC, self.helper
+        )
         grad[0] = grad_leps[0] - grad_leps[1]
 
         grad += self.grad_harm(x)
@@ -55,7 +59,9 @@ class LepsHOSurface(leps.LepsSurface):
         rAB = x[0]
 
         hessian = np.zeros(shape=(2, 2))
-        hessian_leps = self.hessian_V_LEPS(rAB, self.rAC - rAB, self.rAC)
+        hessian_leps = leps.LepsSurface.hessian_V_LEPS(
+            rAB, self.rAC - rAB, self.rAC, self.helper
+        )
         hessian[0, 0] = (
             hessian_leps[0, 0] - 2.0 * hessian_leps[0, 1] + hessian_leps[1, 1]
         )

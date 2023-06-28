@@ -4,26 +4,43 @@ import numpy.typing as npt
 from numba import njit, int32, float64, typed
 from numba.experimental import jitclass
 
+
 @jitclass(
     [
-        ("a",   float64),
-        ("b",   float64),
-        ("c",   float64),
+        ("a", float64),
+        ("b", float64),
+        ("c", float64),
         ("dAB", float64),
         ("dBC", float64),
         ("dAC", float64),
         ("r0", float64),
         ("alpha", float64),
         ("rAC", float64),
-        ("J_matrix", float64[:,:]),
-        ("J_vec", float64[:]),
-        ("diff_J_vec", float64[:]),
-        ("diff2_J_vec", float64[:]),
-        ("ndim", int32)
+        ("J_matrix", float64[:, ::1]),
+        ("J_vec", float64[::1]),
+        ("diff_J_vec", float64[::1]),
+        ("diff2_J_vec", float64[::1]),
+        ("ndim", int32),
     ]
 )
 class LepsSurfaceHelper:
-    def __init__(self, a ,b ,c ,dAB ,dBC ,dAC ,r0 ,alpha ,rAC, J_matrix, J_vec, diff_J_vec, diff2_J_vec, ndim ):
+    def __init__(
+        self,
+        a,
+        b,
+        c,
+        dAB,
+        dBC,
+        dAC,
+        r0,
+        alpha,
+        rAC,
+        J_matrix,
+        J_vec,
+        diff_J_vec,
+        diff2_J_vec,
+        ndim,
+    ):
         self.a = a
         self.b = b
         self.c = c
@@ -115,7 +132,7 @@ class LepsSurfaceHelper:
                 + 6.0 * self.alpha * np.exp(-self.alpha * (r - self.r0))
             )
         )
-    
+
     def diff2_Q(self, r: float, d: float):
         """second derivative of Q helper function wrt r
 
@@ -154,6 +171,7 @@ class LepsSurfaceHelper:
             )
         )
 
+
 class LepsSurface(energy_surface.EnergySurface):
     """The LEPS surface. See G. Henkelman, G. J ́ohannesson, H. J ́onsson. Methods for Finding Saddle Points and Mini- mum Energy Paths, In ”Theoretical Methods in Condensed Phase Chemistry”, edited by S.D. Schwartz, pages 269-30"""
 
@@ -179,22 +197,21 @@ class LepsSurface(energy_surface.EnergySurface):
         self.diff2_J_vec = np.zeros(3)
 
         self.helper = LepsSurfaceHelper(
-            a = self.a,
-            b = self.b,
-            c = self.c,
-            dAB = self.dAB,
-            dBC = self.dBC,
-            dAC = self.dAC,
-            r0 = self.r0,
-            alpha = self.alpha,
-            rAC = self.rAC,
-            J_matrix = self.J_matrix,
+            a=self.a,
+            b=self.b,
+            c=self.c,
+            dAB=self.dAB,
+            dBC=self.dBC,
+            dAC=self.dAC,
+            r0=self.r0,
+            alpha=self.alpha,
+            rAC=self.rAC,
+            J_matrix=self.J_matrix,
             J_vec=self.J_vec,
             diff_J_vec=self.diff_J_vec,
             diff2_J_vec=self.diff2_J_vec,
-            ndim = self.ndim
+            ndim=self.ndim,
         )
-
 
     def Q(self, r: float, d: float):
         """Q helper function
@@ -234,9 +251,9 @@ class LepsSurface(energy_surface.EnergySurface):
                 - 6.0 * np.exp(-self.alpha * (r - self.r0))
             )
         )
-    
+
     @staticmethod
-    @njit
+    @njit()
     def V_LEPS(rAB, rBC, rAC, params):
         """The leps potential function
 
@@ -334,7 +351,9 @@ class LepsSurface(energy_surface.EnergySurface):
 
         J_contribution = np.sqrt(np.dot(params.J_vec, params.J_matrix @ params.J_vec))
 
-        J_grad = 1.0 / J_contribution * params.J_matrix @ params.J_vec * params.diff_J_vec
+        J_grad = (
+            1.0 / J_contribution * params.J_matrix @ params.J_vec * params.diff_J_vec
+        )
 
         grad -= J_grad
         return grad
@@ -405,13 +424,11 @@ class LepsSurface(energy_surface.EnergySurface):
             _type_: _description_
         """
 
-        hessian_q = np.diag(
-            [
-                params.diff2_Q(rAB, params.dAB) / (1.0 + params.a),
-                params.diff2_Q(rBC, params.dBC) / (1.0 + params.b),
-                params.diff2_Q(rAC, params.dAC) / (1.0 + params.c),
-            ]
-        )
+        hessian_q = np.zeros((3, 3))
+
+        hessian_q[0, 0] = params.diff2_Q(rAB, params.dAB) / (1.0 + params.a)
+        hessian_q[1, 1] = params.diff2_Q(rBC, params.dBC) / (1.0 + params.b)
+        hessian_q[2, 2] = params.diff2_Q(rAC, params.dAC) / (1.0 + params.c)
 
         params.J_vec[0] = params.J(rAB, params.dAB) / (1.0 + params.a)
         params.J_vec[1] = params.J(rBC, params.dBC) / (1.0 + params.b)
@@ -426,7 +443,9 @@ class LepsSurface(energy_surface.EnergySurface):
         params.diff2_J_vec[2] = params.diff2_J(rAC, params.dAC) / (1.0 + params.c)
 
         J_contribution = np.sqrt(np.dot(params.J_vec, params.J_matrix @ params.J_vec))
-        J_grad = 1.0 / J_contribution * params.J_matrix @ params.J_vec * params.diff_J_vec
+        J_grad = (
+            1.0 / J_contribution * params.J_matrix @ params.J_vec * params.diff_J_vec
+        )
 
         hessian_j = (
             1.0

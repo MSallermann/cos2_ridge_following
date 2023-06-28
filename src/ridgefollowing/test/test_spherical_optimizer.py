@@ -95,14 +95,14 @@ def test_pole():
 
 
 def test_ring_search():
-    centers = np.array([[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]])
+    centers = np.array([[0.0, 0.0], [1.0, 0.0], [-1.0, 0.0], [0.0, 1.0], [0.0, -1.0]])
 
     widths = np.ones(5) / 2
 
     magnitudes = np.ones(5)
-    magnitudes[0] = -1
+    magnitudes[0] = -1.0
 
-    matrices = np.array([np.diag([1, 1]) for i in range(5)])
+    matrices = np.array([np.diag([1.0, 1.0]) for i in range(5)])
 
     esurf = gaussians.GaussianSurface(
         magnitudes=magnitudes, matrices=matrices, widths=widths, centers=centers, ndim=2
@@ -123,7 +123,9 @@ def test_ring_search():
     )
     sopt.pole = -1
 
-    directions_opt_expected = np.array([[1, 1], [-1, 1], [1, -1], [-1, -1]])
+    directions_opt_expected = np.array(
+        [[1.0, 1.0], [-1.0, 1.0], [1.0, -1.0], [-1.0, -1.0]]
+    )
 
     Nphi = len(directions_opt_expected)
 
