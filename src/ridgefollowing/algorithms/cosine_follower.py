@@ -206,7 +206,9 @@ class CosineFollower(ridgefollower.RidgeFollower):
 
         return [res.x_opt, prefactor * res.f_opt, prefactor * res.g_opt]
 
-    def find_maximum_on_hyperplane(self, x0: npt.NDArray, normal: npt.NDArray, max_dist : float):
+    def find_maximum_on_hyperplane(
+        self, x0: npt.NDArray, normal: npt.NDArray, max_dist: float
+    ):
         normal /= np.linalg.norm(normal)
 
         prefactor = -1.0 if self.maximize else 1.0
@@ -461,10 +463,16 @@ class CosineFollower(ridgefollower.RidgeFollower):
         else:
             for f in factor_list:
                 delta_x = self.find_maximum_on_hyperplane(
-                    x0 + f * self.radius * search_direction, normal=search_direction, max_dist=10*self.radius*f
+                    x0 + f * self.radius * search_direction,
+                    normal=search_direction,
+                    max_dist=10 * self.radius * f,
                 )
-                l = self.get_dir_with_max_verlap(v0=search_direction, s=self.grad_C2_mod(x0 + delta_x) )
-                success = self.feel_out_ridge(x0 + delta_x, search_direction=l, n_factors=n_factors)
+                l = self.get_dir_with_max_verlap(
+                    v0=search_direction, s=self.grad_C2_mod(x0 + delta_x)
+                )
+                success = self.feel_out_ridge(
+                    x0 + delta_x, search_direction=l, n_factors=n_factors
+                )
                 if success:
                     break
             if not success:

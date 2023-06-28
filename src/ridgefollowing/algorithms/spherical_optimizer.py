@@ -58,6 +58,11 @@ class SphericalOptimization:
         """Convert embedding space coordinates to stereographic coordinates"""
         assert len(x_embed) == self.ndim
 
+        if not np.isclose(np.linalg.norm(x_embed), 1.0):
+            print(np.linalg.norm(x_embed))
+            print(x_embed)
+            assert False
+
         self.x_stereo[:] = x_embed[:-1] / (1.0 - self.pole * x_embed[-1])
         return self.x_stereo
 
@@ -111,7 +116,7 @@ class SphericalOptimization:
             jac=self.grad_stereo,
             options=dict(disp=self.disp, maxiter=self.maxiter),
             callback=self.switch_pole_cb,
-            tol=self.tolerance
+            tol=self.tolerance,
         )
 
         if self.assert_success:

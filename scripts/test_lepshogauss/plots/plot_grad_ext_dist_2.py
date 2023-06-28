@@ -11,7 +11,7 @@ folder = Path("./data400")
 
 settings = plot_surface.PlotSettings(
     width=15 * plot_surface.cm,
-    outfile="plot_grad_ext_crit.png",
+    outfile="plot_grad_ext_dist2.png",
     lims=lims,
     plot_energy=plot_surface.ScalarPlotSettings(
         contourlevels=40,
@@ -22,15 +22,17 @@ settings = plot_surface.PlotSettings(
         log_compression=False,
         zorder=9,
     ),
-    plot_grad_ext_crit=plot_surface.ScalarPlotSettings(
+    plot_grad_ext_dist2=plot_surface.ScalarPlotSettings(
         contourlevels=30,
         log_compression=False,
         colormap="coolwarm",
         contours_filled=True,
-        flip_sign=False,
+        flip_sign=True,
+        zorder=2,
     ),
     output_data_folder=folder,
-    input_data_folder=folder,
+    # input_data_folder=folder,
+    show=True,
     npoints=np.array([400, 400]),
 )
 

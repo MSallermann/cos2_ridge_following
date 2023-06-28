@@ -36,13 +36,23 @@ settings = plot_surface.PlotSettings(
     ),
 )
 
+import matplotlib.patheffects as pe
 
-def plot_walks(output_dir: Path, color, label : bool):
+
+def plot_walks(output_dir: Path, color, label: bool):
     trajectory = np.load(output_dir / "x_cur.npy")
 
     settings.path_plots.append(
         plot_surface.PathPlotSettings(
-            points=trajectory, color=color, marker="o", zorder=10, label_points=label
+            points=trajectory,
+            color=color,
+            marker=".",
+            zorder=10,
+            label_points=label,
+            lw=2,
+            kwargs=dict(
+                path_effects=[pe.Stroke(linewidth=3, foreground="black"), pe.Normal()]
+            ),
         )
     )
     settings.path_plots.append(
@@ -60,7 +70,7 @@ def main(
     grad_norm: bool,
     data_folder: Optional[str],
     regenerate_data: bool,
-    label_points : bool = False
+    label_points: bool = False,
 ):
     if not data_folder is None:
         f = Calculation_Folder(data_folder, descriptor_file="meta.toml")
@@ -105,7 +115,6 @@ if __name__ == "__main__":
     parser.add_argument("--regenerate_data", action="store_true")
     parser.add_argument("--label", action="store_true")
 
-
     args = parser.parse_args()
 
     main(
@@ -116,5 +125,5 @@ if __name__ == "__main__":
         args.norm,
         args.datafolder,
         args.regenerate_data,
-        args.label
+        args.label,
     )
