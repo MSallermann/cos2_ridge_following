@@ -25,7 +25,9 @@ def test_spherical_optimizer():
 
         x_initial /= np.linalg.norm(x_initial)
 
-        x_stereo = soptimizer.embed_to_stereo(x_initial)
+        x_stereo = spherical_optimizer.SphericalOptimization.embed_to_stereo(
+            x_initial, soptimizer.pole
+        )
         f_embed = fun(x_initial)
         f_stereo = soptimizer.f_stereo(x_stereo)
 
@@ -36,7 +38,9 @@ def test_spherical_optimizer():
         assert np.allclose(grad_stereo, fd_grad_stereo)
 
         x_stereo += np.array(np.random.random(ndim - 1))
-        x_embed = soptimizer.stereo_to_embed(x_stereo)
+        x_embed = spherical_optimizer.SphericalOptimization.stereo_to_embed(
+            x_stereo, soptimizer.pole
+        )
 
         assert np.isclose(np.linalg.norm(x_embed), 1.0)
 
@@ -70,7 +74,9 @@ def test_pole():
     )
 
     soptimizer.pole = -1
-    x_stereo = soptimizer.embed_to_stereo(x_initial)
+    x_stereo = spherical_optimizer.SphericalOptimization.embed_to_stereo(
+        x_initial, soptimizer.pole
+    )
     f_embed = fun(x_initial)
     f_stereo = soptimizer.f_stereo(x_stereo)
     assert np.isclose(f_embed, f_stereo)
@@ -80,7 +86,9 @@ def test_pole():
     assert np.allclose(grad_stereo, fd_grad_stereo)
 
     x_stereo += np.array(np.random.random(ndim - 1))
-    x_embed = soptimizer.stereo_to_embed(x_stereo)
+    x_embed = spherical_optimizer.SphericalOptimization.stereo_to_embed(
+        x_stereo, soptimizer.pole
+    )
     assert np.isclose(np.linalg.norm(x_embed), 1.0)
 
     soptimizer.pole = 1
@@ -143,7 +151,9 @@ def test_ring_search():
         d /= np.linalg.norm(d)
 
         # sopt.switch_pole_if_necessary(d)
-        x_stereo_ini[ip] = sopt.embed_to_stereo(d)
+        x_stereo_ini[ip] = spherical_optimizer.SphericalOptimization.embed_to_stereo(
+            d, sopt.pole
+        )
 
         # Find expected direction with maximum overlap with initial direction
         overlaps = [
