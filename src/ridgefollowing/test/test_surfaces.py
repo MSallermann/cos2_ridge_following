@@ -7,6 +7,7 @@ from ridgefollowing.surfaces import (
     lepsho,
     lepshogauss,
     quadratic,
+    cosine_ssbench,
     cubic,
 )
 import numdifftools as nd
@@ -21,7 +22,7 @@ def test_against_fd():
 
     # Two dimensional test points
     test_points_2d = np.array(
-        [[1.0, 0], [-1.0, 0.5], [2, 2], [-1, 4], [0, 0], [-1, 2], [-1.0, 4.742]]
+        [[0.0, 1.0], [-1.0, 0.5], [2, 2], [-1, 4], [0, 0], [-1, 2], [-1.0, 4.742]]
     )
 
     # 1. The Muller brown surface
@@ -46,6 +47,9 @@ def test_against_fd():
     ngauss = 3
     magnitudes = np.linspace(-5, 5, ngauss)
     widths = np.linspace(1, 3, ngauss)
+
+    # 7. cosine surface from A. Jay at SSBench workshop
+    esurf_ssbench = cosine_ssbench.CosineSSBENCH()
 
     centers = np.zeros(shape=(ngauss, ndim))
     for dim in range(ndim):
@@ -79,6 +83,7 @@ def test_against_fd():
         [esurf_lepshogauss, test_points_2d],
         [esurf_quadratic, test_points_2d],
         [esurf_cubic, test_points_2d],
+        [esurf_ssbench, test_points_2d],
         [esurf_gauss, test_points_gauss],
     ]:
         for x in test_points:
