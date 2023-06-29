@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 from scipy.optimize import minimize
 import numdifftools as nd
+from numba import njit
 
 
 class CosineFollower(ridgefollower.RidgeFollower):
@@ -21,6 +22,8 @@ class CosineFollower(ridgefollower.RidgeFollower):
         super().__init__(energy_surface, n_iterations_follow, output_path)
 
         self.tolerance: float = tolerance
+        self.tolerance_grad: float = tolerance
+
         self.maxiter: int = maxiter
         self.radius: float = radius
 
@@ -106,7 +109,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
             -0.5 / self.width_modified_gaussian**2 * (evals[1] - evals[0]) ** 2
         )
 
-    def adaptive_gradient(self, fun, x, tolerance, n=1, method="central"):
+    def adaptive_gradient(self, fun, x, n=1, method="central"):
         order = 2
         richardson_terms = 2
 
@@ -120,7 +123,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
         )(x)
         err_f = np.max(res.error_estimate)
 
-        while err_f > tolerance and order <= 8 and richardson_terms <= 8:
+        while err_f > self.tolerance_grad and order <= 8 and richardson_terms <= 8:
             order *= 2
             grad, res = nd.Gradient(
                 fun,
@@ -142,7 +145,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
 
     def grad_C2_mod(self, x: npt.ArrayLike) -> npt.NDArray:
         """Computes the gradient of the modified C2 value"""
-        return self.adaptive_gradient(self.C2_mod, x, self.tolerance)
+        return self.adaptive_gradient(self.C2_mod, x)
 
     def C2_anharmonic(
         self, x0: npt.NDArray, g0: npt.NDArray, h0: npt.NDArray, x: npt.NDArray
@@ -400,17 +403,13 @@ class CosineFollower(ridgefollower.RidgeFollower):
             a = np.atleast_1d(a)
             return self.C2_mod(self._x_cur + a[0] * orth_dir)
 
-        self._ridge_width = self.adaptive_gradient(
-            fun, x=np.zeros(1), tolerance=self.tolerance, n=2
-        )
+        self._ridge_width = self.adaptive_gradient(fun, x=np.zeros(1), n=2)
 
         C2p = fun(self.radius)
         C20 = fun(0)
         C2m = fun(-self.radius)
 
-        print(orth_dir)
         self._ridge_width_fw = (C2p - C20) / self.radius
-
         self._ridge_width_bw = (C2m - C20) / self.radius
 
         # self._ridge_width_fw = self.adaptive_gradient(
@@ -437,7 +436,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
             )
 
             # Check the overlap
-            if not np.dot(self._d_cur, search_direction) < 0.1:
+            if not np.dot(self._d_cur, search_direction) < 0.5:
                 success = True
                 break
 
