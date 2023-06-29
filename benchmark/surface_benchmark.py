@@ -1,6 +1,6 @@
 import timeit
 import numpy as np
-from ridgefollowing.surfaces import muller_brown, leps, lepsho, lepshogauss
+from ridgefollowing.surfaces import muller_brown, leps, lepsho, lepshogauss, cosine_ssbench
 
 
 def benchmark(fun, number=10000, x=np.array([1.0, 1.0]), prints=True):
@@ -25,3 +25,5 @@ benchmark_surface(muller_brown.MullerBrownSurface())
 benchmark_surface(leps.LepsSurface())
 benchmark_surface(lepsho.LepsHOSurface())
 benchmark_surface(lepshogauss.LepsHOGaussSurface())
+benchmark_surface(cosine_ssbench.CosineSSBENCH())
+
