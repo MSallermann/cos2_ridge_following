@@ -5,6 +5,7 @@ import numpy.typing as npt
 from numdifftools import Gradient
 from typing import Optional
 from pydantic import BaseModel
+from numba import njit
 
 
 class SphericalOptimization:
@@ -44,67 +45,72 @@ class SphericalOptimization:
         self.disp: bool = disp
         self.assert_success: bool = assert_success
 
-    def switch_pole_if_necessary(self, x_embed: Optional[npt.NDArray] = None):
-        if x_embed is None:
-            x_embed = self.x_embed
-
+    def switch_pole_if_necessary(self, x_embed):
         if np.abs(1.0 - self.pole * x_embed[-1]) < 1.0:
             self.pole *= -1
             return True
         else:
             return False
 
-    def embed_to_stereo(self, x_embed):
+    @staticmethod
+    @njit(cache=True)
+    def embed_to_stereo(x_embed, pole):
         """Convert embedding space coordinates to stereographic coordinates"""
-        assert len(x_embed) == self.ndim
 
-        if not np.isclose(np.linalg.norm(x_embed), 1.0):
-            print(np.linalg.norm(x_embed))
-            print(x_embed)
-            assert False
+        x_stereo = x_embed[:-1] / (1.0 - pole * x_embed[-1])
+        return x_stereo
 
-        self.x_stereo[:] = x_embed[:-1] / (1.0 - self.pole * x_embed[-1])
-        return self.x_stereo
-
-    def stereo_to_embed(self, x_stereo):
+    @staticmethod
+    @njit(cache=True)
+    def stereo_to_embed(x_stereo, pole):
         """Convert stereographic coordinates to embedding space coordinates"""
-        assert len(x_stereo) == self.ndim - 1
 
         s2 = np.linalg.norm(x_stereo) ** 2
-        self.x_embed[-1] = self.pole * (s2 - 1.0) / (s2 + 1.0)
-        self.x_embed[:-1] = x_stereo * (1.0 - self.pole * self.x_embed[-1])
-        return self.x_embed
+        x_embed = np.empty(len(x_stereo) + 1)
+        x_embed[-1] = pole * (s2 - 1.0) / (s2 + 1.0)
+        x_embed[:-1] = x_stereo * (1.0 - pole * x_embed[-1])
+        return x_embed
 
     def f_stereo(self, x_stereo):
         """Compute the function value from stereographic coordinates"""
         assert len(x_stereo) == self.ndim - 1
 
-        self.x_embed = self.stereo_to_embed(x_stereo)
+        self.x_embed = SphericalOptimization.stereo_to_embed(x_stereo, self.pole)
         res = self.fun(self.x_embed)
         return res
+
+    @staticmethod
+    @njit(cache=True)
+    def convert_embed_grad_to_stereo_grad(grad_embed, x_stereo, x_embed, pole):
+        grad_stereo = np.zeros(len(x_stereo))
+        s = np.linalg.norm(x_stereo)
+
+        grad_stereo = (1.0 - pole * x_embed[-1]) * grad_embed[:-1]
+        grad_stereo += (
+            pole
+            * 4
+            / (s**2 + 1.0) ** 2
+            * x_stereo
+            * (grad_embed[-1] - pole * np.dot(grad_embed[:-1], x_stereo))
+        )
+
+        return grad_stereo
 
     def grad_stereo(self, x_stereo):
         """Compute the function gradient from stereographic coordinates"""
         assert len(x_stereo) == self.ndim - 1
 
-        x_embed = self.stereo_to_embed(x_stereo)
+        x_embed = SphericalOptimization.stereo_to_embed(x_stereo, self.pole)
         grad_embed = self.grad(x_embed)
-        grad_stereo = np.zeros(len(x_stereo))
-        s = np.linalg.norm(x_stereo)
 
-        grad_stereo = (1.0 - self.pole * x_embed[-1]) * grad_embed[:-1]
-        grad_stereo += (
-            self.pole
-            * 4
-            / (s**2 + 1.0) ** 2
-            * x_stereo
-            * (grad_embed[-1] - self.pole * np.dot(grad_embed[:-1], x_stereo))
+        return SphericalOptimization.convert_embed_grad_to_stereo_grad(
+            grad_embed=grad_embed, x_stereo=x_stereo, x_embed=x_embed, pole=self.pole
         )
 
-        return grad_stereo
-
     def switch_pole_cb(self, x_stereo):
-        self.switch_pole_if_necessary(self.stereo_to_embed(x_stereo))
+        self.switch_pole_if_necessary(
+            SphericalOptimization.stereo_to_embed(x_stereo, self.pole)
+        )
 
     def minimize(self, x0) -> Result:
         self.switch_pole_if_necessary(x0)
@@ -112,7 +118,7 @@ class SphericalOptimization:
         res = minimize(
             fun=self.f_stereo,
             method="L-BFGS-B",
-            x0=self.embed_to_stereo(x0),
+            x0=SphericalOptimization.embed_to_stereo(x0, self.pole),
             jac=self.grad_stereo,
             options=dict(disp=self.disp, maxiter=self.maxiter),
             callback=self.switch_pole_cb,
@@ -123,8 +129,8 @@ class SphericalOptimization:
             assert res.success
 
         return SphericalOptimization.Result(
-            x_opt=np.array(self.stereo_to_embed(res.x)),
-            g_opt=np.array(self.stereo_to_embed(res.jac)),
+            x_opt=np.array(SphericalOptimization.stereo_to_embed(res.x, self.pole)),
+            g_opt=np.array(SphericalOptimization.stereo_to_embed(res.jac, self.pole)),
             f_opt=res.fun,
             x_opt_stero=res.x,
             g_opt_stero=res.jac,

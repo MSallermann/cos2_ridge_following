@@ -1,6 +1,8 @@
 from ridgefollowing import energy_surface
 import numpy as np
 import numpy.typing as npt
+from numba import jit
+from numba import float64, int32
 
 
 class GaussianSurface(energy_surface.EnergySurface):
@@ -32,56 +34,93 @@ class GaussianSurface(energy_surface.EnergySurface):
         assert self.centers.shape == (self.n_gaussians, self.ndim)
         assert self.widths.shape == (self.n_gaussians,)
 
-    def energy(self, x: npt.ArrayLike) -> npt.NDArray:
+    @staticmethod
+    @jit(nopython=True, cache=True)
+    def energy_helper(x, n_gaussians, magnitudes, centers, widths, matrices):
         E = 0
 
-        for igauss in range(self.n_gaussians):
-            d = x - self.centers[igauss]
-            w = 1.0 / (2.0 * self.widths[igauss] ** 2)
-            M = np.dot(d, np.matmul(self.matrices[igauss], d))
+        for igauss in range(n_gaussians):
+            d = x - centers[igauss]
+            w = 1.0 / (2.0 * widths[igauss] ** 2)
+            M = np.dot(d, matrices[igauss] @ d)
 
-            E += self.magnitudes[igauss] * np.exp(w * M)
-
+            E += magnitudes[igauss] * np.exp(w * M)
         return E
 
-    def gradient(self, x: npt.ArrayLike) -> npt.NDArray:
-        grad = np.zeros(self.ndim)
+    def energy(self, x: npt.ArrayLike) -> npt.NDArray:
+        return GaussianSurface.energy_helper(
+            x,
+            n_gaussians=self.n_gaussians,
+            magnitudes=self.magnitudes,
+            centers=self.centers,
+            widths=self.widths,
+            matrices=self.matrices,
+        )
 
-        for igauss in range(self.n_gaussians):
-            d = x - self.centers[igauss]
-            w = 1.0 / (2.0 * self.widths[igauss] ** 2)
-            prefactor = self.magnitudes[igauss] * w
+    @staticmethod
+    @jit(nopython=True, cache=True)
+    def gradient_helper(x, ndim, n_gaussians, magnitudes, centers, widths, matrices):
+        grad = np.zeros(ndim)
 
-            exponential = np.exp(w * np.dot(d, np.matmul(self.matrices[igauss], d)))
+        for igauss in range(n_gaussians):
+            d = x - centers[igauss]
+            w = 1.0 / (2.0 * widths[igauss] ** 2)
+            prefactor = magnitudes[igauss] * w
 
-            grad += prefactor * 2 * np.matmul(self.matrices[igauss], d) * exponential
+            exponential = np.exp(w * np.dot(d, matrices[igauss] @ d))
+
+            grad += prefactor * 2 * matrices[igauss] @ d * exponential
 
         return grad
 
-    def hessian(self, x: npt.ArrayLike) -> npt.ArrayLike:
-        hessian = np.zeros((self.ndim, self.ndim))
+    def gradient(self, x: npt.ArrayLike) -> npt.NDArray:
+        return GaussianSurface.gradient_helper(
+            x,
+            ndim=self.ndim,
+            n_gaussians=self.n_gaussians,
+            magnitudes=self.magnitudes,
+            centers=self.centers,
+            widths=self.widths,
+            matrices=self.matrices,
+        )
 
-        for igauss in range(self.n_gaussians):
-            d = x - self.centers[igauss]
-            w = 1.0 / (2.0 * self.widths[igauss] ** 2)
+    @staticmethod
+    @jit(nopython=True, cache=True)
+    def hessian_helper(x, ndim, n_gaussians, magnitudes, centers, widths, matrices):
+        hessian = np.zeros((ndim, ndim))
 
-            Md = np.matmul(self.matrices[igauss], d)
+        for igauss in range(n_gaussians):
+            d = x - centers[igauss]
+            w = 1.0 / (2.0 * widths[igauss] ** 2)
 
-            exponential = np.exp(w * np.dot(d, np.matmul(self.matrices[igauss], d)))
+            Md = matrices[igauss] @ d
 
-            for i in range(self.ndim):
-                for j in range(self.ndim):
+            exponential = np.exp(w * np.dot(d, matrices[igauss] @ d))
+
+            for i in range(ndim):
+                for j in range(ndim):
                     hessian[i, j] += (
-                        2
-                        * self.magnitudes[igauss]
+                        2.0
+                        * magnitudes[igauss]
                         * w
                         * (
-                            2 * w * exponential * Md[i] * Md[j]
-                            + exponential * self.matrices[igauss, i, j]
+                            2.0 * w * exponential * Md[i] * Md[j]
+                            + exponential * matrices[igauss, i, j]
                         )
                     )
 
         return hessian
+
+    def hessian(self, x: npt.ArrayLike) -> npt.ArrayLike:
+        return GaussianSurface.hessian_helper(
+            x,
+            ndim=self.ndim,
+            n_gaussians=self.n_gaussians,
+            magnitudes=self.magnitudes,
+            centers=self.centers,
+            widths=self.widths,
+            matrices=self.matrices,
+        )
 
     def curvature(self, x: npt.ArrayLike, dir: npt.ArrayLike) -> npt.NDArray:
         dir_n = dir / np.linalg.norm(dir)

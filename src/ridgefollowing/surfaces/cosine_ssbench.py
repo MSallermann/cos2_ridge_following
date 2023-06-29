@@ -2,25 +2,38 @@ from ridgefollowing import energy_surface
 import numpy as np
 import numpy.typing as npt
 
+from numba import njit, int32, float64, typed
+from numba.experimental import jitclass
 
-class CosineSSBENCH(energy_surface.EnergySurface):
-    def __init__(
-        self,
-    ):
-        super().__init__(ndim=2)
+
+@jitclass(
+    [
+        ("A1", float64),
+        ("Bxy1", float64),
+        ("Bx1", float64),
+        ("By1", float64),
+        ("A2", float64),
+        ("Bx2", float64),
+        ("By2", float64),
+        ("A3", float64),
+        ("B3", float64),
+        ("X3", float64),
+        ("Y3", float64),
+    ]
+)
+class CosineSSBENCH_Parameters:
+    def __init__(self):
         self.A1 = 0.5
         self.Bxy1 = 0.2
         self.Bx1 = 0.6
         self.By1 = 0.5
-
-        self.A2 = 1
-        self.Bx2 = 1
+        self.A2 = 1.0
+        self.Bx2 = 1.0
         self.By2 = 1.5
-
-        self.A3 = -1
+        self.A3 = -1.0
         self.B3 = 0.008
-        self.X3 = 17
-        self.Y3 = 17
+        self.X3 = 17.0
+        self.Y3 = 17.0
 
     def f1(self, x, y):
         return (
@@ -169,11 +182,23 @@ class CosineSSBENCH(energy_surface.EnergySurface):
         )
         return np.array([[hxx, hxy], [hxy, hyy]])
 
+
+class CosineSSBENCH(energy_surface.EnergySurface):
+    def __init__(
+        self,
+    ):
+        super().__init__(ndim=2)
+        self.params = CosineSSBENCH_Parameters()
+
     def energy(self, x: npt.NDArray) -> float:
-        return self.f1(*x) + self.f2(*x) + self.f3(*x)
+        return self.params.f1(*x) + self.params.f2(*x) + self.params.f3(*x)
 
     def gradient(self, x: npt.NDArray) -> npt.NDArray:
-        return self.grad_f1(*x) + self.grad_f2(*x) + self.grad_f3(*x)
+        return (
+            self.params.grad_f1(*x) + self.params.grad_f2(*x) + self.params.grad_f3(*x)
+        )
 
     def hessian(self, x: npt.NDArray) -> npt.NDArray:
-        return self.hess_f1(*x) + self.hess_f2(*x) + self.hess_f3(*x)
+        return (
+            self.params.hess_f1(*x) + self.params.hess_f2(*x) + self.params.hess_f3(*x)
+        )
