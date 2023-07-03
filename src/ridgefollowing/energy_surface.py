@@ -9,11 +9,11 @@ class EnergySurface(abc.ABC):
         self.ndim = ndim
 
     @abc.abstractmethod
-    def energy(self, x: npt.ArrayLike) -> float:
+    def energy(self, x: npt.NDArray) -> float:
         """Energy at point x
 
         Args:
-            x (npt.ArrayLike): the point on the energy surface
+            x (npt.NDArray): the point on the energy surface
 
         Returns:
             float: energy
@@ -21,24 +21,24 @@ class EnergySurface(abc.ABC):
         # Overwrite in child classes
         ...
 
-    def gradient(self, x: npt.ArrayLike) -> npt.NDArray:
+    def gradient(self, x: npt.NDArray) -> npt.NDArray:
         """Gradient of energy
 
         Args:
-            x (npt.ArrayLike): the point on the energy surface
+            x (npt.NDArray): the point on the energy surface
 
         Returns:
-            npt.ArrayLike: the gradient
+            npt.NDArray: the gradient
         """
         # Fallback uses FD
         return self.fd_gradient(x)
 
-    def directional_gradient(self, x: npt.ArrayLike, dir: npt.ArrayLike) -> npt.NDArray:
+    def directional_gradient(self, x: npt.NDArray, dir: npt.NDArray) -> npt.NDArray:
         """Directional derivative.
 
         Args:
-            x (npt.ArrayLike): the point on the energy surface
-            dir (npt.ArrayLike): the direction
+            x (npt.NDArray): the point on the energy surface
+            dir (npt.NDArray): the direction
 
         Returns:
             npt.NDArray: dot product of gradient and direction
@@ -46,12 +46,12 @@ class EnergySurface(abc.ABC):
         dir_n = dir / np.linalg.norm(dir)
         return np.dot(self.gradient(x), dir_n)
 
-    def curvature(self, x: npt.ArrayLike, dir: npt.ArrayLike) -> npt.NDArray:
+    def curvature(self, x: npt.NDArray, dir: npt.NDArray) -> npt.NDArray:
         """The curvature at point x in direction dir
 
         Args:
-            x (npt.ArrayLike): the point on the energy surface
-            dir (npt.ArrayLike): the direction
+            x (npt.NDArray): the point on the energy surface
+            dir (npt.NDArray): the direction
 
         Attention!: dir must be normalized
 
@@ -61,35 +61,35 @@ class EnergySurface(abc.ABC):
         # Fallback uses FD
         return self.fd_curvature(x, dir)
 
-    def hessian(self, x: npt.ArrayLike) -> npt.NDArray:
+    def hessian(self, x: npt.NDArray) -> npt.NDArray:
         """Hessian matrix
 
         Args:
-            x (npt.ArrayLike): point at which to compute the hessian
+            x (npt.NDArray): point at which to compute the hessian
 
         Returns:
             npt.NDArray: the hessian
         """
         return self.fd_hessian(x)
 
-    def fd_gradient(self, x: npt.ArrayLike) -> npt.NDArray:
+    def fd_gradient(self, x: npt.NDArray) -> npt.NDArray:
         """Gradient of energy, computed with finite differences
 
         Args:
-            x (npt.ArrayLike): the point on the energy surface
+            x (npt.NDArray): the point on the energy surface
 
         Returns:
-            npt.ArrayLike: the gradient
+            npt.NDArray: the gradient
         """
         # Fallback uses FD
         return nd.Gradient(self.energy)(x)
 
-    def fd_curvature(self, x: npt.ArrayLike, dir: npt.ArrayLike) -> npt.NDArray:
+    def fd_curvature(self, x: npt.NDArray, dir: npt.NDArray) -> npt.NDArray:
         """The curvature at point x in direction dir, computed with finite differences
 
         Args:
-            x (npt.ArrayLike): the point on the energy surface
-            dir (npt.ArrayLike): the direction
+            x (npt.NDArray): the point on the energy surface
+            dir (npt.NDArray): the direction
 
         Attention!: dir must be normalized
 
@@ -98,11 +98,11 @@ class EnergySurface(abc.ABC):
         """
         return nd.Gradient(self.directional_gradient)(x, dir)
 
-    def fd_hessian(self, x: npt.ArrayLike) -> npt.NDArray:
+    def fd_hessian(self, x: npt.NDArray) -> npt.NDArray:
         """Hessian matrix using finite differences
 
         Args:
-            x (npt.ArrayLike): point at which to compute the hessian
+            x (npt.NDArray): point at which to compute the hessian
 
         Returns:
             npt.NDArray: the hessian
