@@ -37,8 +37,7 @@ class GaussianSurface(energy_surface.EnergySurface):
     @staticmethod
     @jit(nopython=True, cache=True)
     def energy_helper(x, n_gaussians, magnitudes, centers, widths, matrices):
-        E = 0
-
+        E = 0.0
         for igauss in range(n_gaussians):
             d = x - centers[igauss]
             w = 1.0 / (2.0 * widths[igauss] ** 2)

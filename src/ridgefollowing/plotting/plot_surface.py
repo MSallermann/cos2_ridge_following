@@ -213,9 +213,9 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
     if ax is None:
         pplot = Paper_Plot(width=settings.width)
 
-        # data_aspect_ratio = (settings.lims[0][1] - settings.lims[0][0]) / (settings.lims[1][1] - settings.lims[1][0])
+        data_aspect_ratio = (settings.lims[0][1] - settings.lims[0][0]) / (settings.lims[1][1] - settings.lims[1][0])
         pplot.apply_absolute_margins(
-            aspect_ratio=1,
+            aspect_ratio=data_aspect_ratio,
             abs_horizontal_margins=settings.abs_horizontal_margins,
             abs_vertical_margins=settings.abs_vertical_margins,
         )
@@ -228,8 +228,8 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
     assert surface.ndim == 2
 
     if settings.input_data_folder is None:
-        X = np.linspace(settings.lims[0, 0], settings.lims[0, 1], settings.npoints[0])
-        Y = np.linspace(settings.lims[1, 0], settings.lims[1, 1], settings.npoints[1])
+        X = np.linspace(settings.lims[0, 0], settings.lims[0, 1], settings.npoints[0], dtype=float)
+        Y = np.linspace(settings.lims[1, 0], settings.lims[1, 1], settings.npoints[1], dtype=float)
         energy = np.empty(shape=settings.npoints)
         c = np.empty(shape=settings.npoints)
         sum_c2 = np.empty(shape=settings.npoints)
@@ -257,7 +257,9 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                 n = len(X) * len(Y)
                 print(f"Point {i} / {n} ( {i/n*100:.2f} %)", end="\r")
 
-                energy[yi, xi] = surface.energy([x, y])
+                xy = np.array([x,y])
+
+                energy[yi, xi] = surface.energy(xy)
 
                 if (
                     settings.plot_mode
@@ -270,15 +272,14 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                     or settings.plot_grad_ext_dist2
                     or settings.plot_grad_ext_crit
                 ):
-                    hessian = surface.hessian([x, y])
+                    hessian = surface.hessian(xy)
                     eigenvals, eigenvecs = modes.eigenpairs(hessian)
 
                     mode[yi, xi] = eigenvecs[:, 0]
                     mode2[yi, xi] = eigenvecs[:, 1]
                     eigenvalues[yi, xi] = eigenvals
 
-                    xcur = np.array([x, y])
-                    G = surface.gradient(xcur)
+                    G = surface.gradient(xy)
 
                     mode[yi, xi] = eigenvecs[:, 0]
                     mode2[yi, xi] = eigenvecs[:, 1]
@@ -321,7 +322,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                     or settings.plot_sum_c2
                     or settings.plot_grad_norm
                 ):
-                    gradient[yi, xi] = surface.gradient([x, y])
+                    gradient[yi, xi] = surface.gradient(xy)
                     gradient_norm[yi, xi] = np.linalg.norm(gradient[yi, xi])
                     gradient[yi, xi] = gradient[yi, xi] / np.linalg.norm(
                         gradient[yi, xi]
@@ -332,14 +333,14 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                     ) ** 2
 
                 if settings.plot_c2 or settings.plot_gradient_c2:
-                    c[yi, xi] = Rfollower.C([x, y])
+                    c[yi, xi] = Rfollower.C(xy)
 
                 if (
                     settings.plot_gradient_c
                     or settings.plot_c_grad_norm
                     or settings.plot_gradient_c2
                 ):
-                    gradient_c[yi, xi] = Rfollower.fd_grad_C([x, y])
+                    gradient_c[yi, xi] = Rfollower.fd_grad_C(xy)
     else:
         assert (
             settings.input_data_folder.is_dir() and settings.input_data_folder.exists()
@@ -471,9 +472,14 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
 
     if not settings.xlim is None:
         ax.set_xlim(settings.xlim)
+    else:
+        ax.set_xlim(settings.lims[0])
 
     if not settings.ylim is None:
         ax.set_ylim(settings.ylim)
+    else:
+        ax.set_ylim(settings.lims[1])
+
 
     ax.set_xlabel("x")
     ax.set_ylabel("y")
