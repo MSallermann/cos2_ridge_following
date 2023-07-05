@@ -2,8 +2,11 @@
 name = "ridgefollowing"
 version = "0.0.1"
 dependencies = [
-    "requests",
-    'importlib-metadata; python_version<"3.8"',
+    "pytest",
+    "numpy",
+    "numdifftools",
+    "numba",
+    "pydantic<2.0"
 ]
 
 [tool.setuptools.packages.find]
