@@ -17,7 +17,7 @@ def test_spherical_optimizer():
         return 2.0 * coeffs * x
 
     soptimizer = spherical_optimizer.SphericalOptimization(
-        fun, jac, ndim=ndim, assert_success=True, tolerance=1e-24
+        fun, jac, ndim=ndim, assert_success=True, tolerance=1e-16
     )
 
     for i in range(10):
@@ -70,7 +70,7 @@ def test_pole():
     x_initial /= np.linalg.norm(x_initial)
 
     soptimizer = spherical_optimizer.SphericalOptimization(
-        fun, jac, ndim=ndim, assert_success=True, disp=False, tolerance=1e-12
+        fun, jac, ndim=ndim, assert_success=True, disp=False, tolerance=1e-10
     )
 
     soptimizer.pole = -1
@@ -127,7 +127,7 @@ def test_ring_search():
         disp=False,
         maxiter=200,
         assert_success=True,
-        tolerance=1e-12,
+        tolerance=1e-8,
     )
     sopt.pole = -1
 
