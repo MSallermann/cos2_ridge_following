@@ -4,7 +4,7 @@ from ridgefollowing.algorithms import modes, cosine_follower, gradient_extremal_
 # from ridgefollowing import ridgefollower
 from spirit_extras.plotting import Paper_Plot
 from typing import Optional, List, Union
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from pathlib import Path
 from dataclasses import dataclass
 import numpy.typing as npt
@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 
 
 class PathPlotSettings(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+            arbitrary_types_allowed = True)
 
     points: npt.NDArray
     ls: str = "-"
@@ -47,8 +47,8 @@ class PathPlotSettings(BaseModel):
 
 
 class ScalarPlotSettings(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+            arbitrary_types_allowed = True)
 
     contours: bool = False
     contours_filled: bool = True
@@ -106,8 +106,8 @@ class ScalarPlotSettings(BaseModel):
 
 
 class VectorPlotSettings(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+            arbitrary_types_allowed = True)
 
     streamplot: bool = True
     quiver: bool = False
@@ -148,9 +148,9 @@ cm = Paper_Plot.cm
 
 
 class PlotSettings(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
-        validate_assignment = True
+    model_config = ConfigDict(
+            arbitrary_types_allowed = True,
+            validate_assignment = True)
 
     outfile: Optional[str] = None  # Figure .png file
     output_data_folder: Optional[Path] = None  # folder to save computed data in

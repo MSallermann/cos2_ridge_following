@@ -1,4 +1,4 @@
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator, ConfigDict
 from typing import List, Optional
 from pathlib import Path
 import numpy.typing as npt
@@ -18,9 +18,9 @@ class FollowerTypes(enum.Enum):
 
 
 class WalkSettings(BaseModel):
-    class Config:
-        arbitrary_types_allowed = True
-        allow_reuse = True
+    model_config = ConfigDict(
+        arbitrary_types_allowed = True,
+        allow_reuse = True)
 
     x0: npt.NDArray
     d0: npt.NDArray
@@ -34,15 +34,15 @@ class WalkSettings(BaseModel):
     bifurcations: bool = False
     bifurcations_folder: Path = Path("bifurcations")
 
-    @validator("x0", "d0", pre=True)
+    @field_validator("x0", "d0", pre=True)
     def convert_to_ndarray(cls, v) -> npt.NDArray:
         return np.array(v, dtype=float)
 
-    @validator("outputfolder", pre=True)
+    @field_validator("outputfolder", pre=True)
     def convert_to_Path(cls, v):
         return Path(v)
 
-    @validator("type", pre=True)
+    @field_validator("type", pre=True)
     def check(cls, v):
         return FollowerTypes[v]
 

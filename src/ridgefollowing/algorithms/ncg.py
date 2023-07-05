@@ -1,14 +1,14 @@
 import numpy.typing as npt
 import numpy as np
 import numdifftools as nd
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 
 class NonLinearConjugateGradient:
     class Result(BaseModel):
-        class Config:
-            arbitrary_types_allowed = True
+        model_config = ConfigDict(
+            arbitrary_types_allowed = True)
 
         x_opt: npt.NDArray
         g_opt: npt.NDArray

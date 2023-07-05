@@ -3,14 +3,14 @@ from scipy.optimize import minimize
 import numpy as np
 import numpy.typing as npt
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from numba import njit
 
 
 class SphericalOptimization:
     class Result(BaseModel):
-        class Config:
-            arbitrary_types_allowed = True
+        model_config = ConfigDict(
+            arbitrary_types_allowed = True)
 
         x_opt: npt.NDArray
         g_opt: npt.NDArray
