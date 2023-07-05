@@ -65,6 +65,8 @@ class ScalarPlotSettings(BaseModel):
     vmin: Optional[float] = None
     extend: Optional[str] = None
 
+    alpha: float = 1.0
+
     zorder: int = 0
 
     def plot(self, ax, X, Y, Z):
@@ -100,6 +102,7 @@ class ScalarPlotSettings(BaseModel):
                     colors=self.colors,
                     linestyles=self.linestyles,
                     zorder=self.zorder,
+                    alpha=self.alpha,
                 )
             )
         return return_vals
@@ -198,6 +201,8 @@ class PlotSettings(BaseModel):
     plot_gradient_c: Optional[VectorPlotSettings] = None
     plot_gradient_c2: Optional[VectorPlotSettings] = None
 
+    plot_basin: Optional[ScalarPlotSettings] = None
+
     show: bool = False
 
 
@@ -213,7 +218,9 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
     if ax is None:
         pplot = Paper_Plot(width=settings.width)
 
-        data_aspect_ratio = (settings.lims[0][1] - settings.lims[0][0]) / (settings.lims[1][1] - settings.lims[1][0])
+        data_aspect_ratio = (settings.lims[0][1] - settings.lims[0][0]) / (
+            settings.lims[1][1] - settings.lims[1][0]
+        )
         pplot.apply_absolute_margins(
             aspect_ratio=data_aspect_ratio,
             abs_horizontal_margins=settings.abs_horizontal_margins,
@@ -228,8 +235,12 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
     assert surface.ndim == 2
 
     if settings.input_data_folder is None:
-        X = np.linspace(settings.lims[0, 0], settings.lims[0, 1], settings.npoints[0], dtype=float)
-        Y = np.linspace(settings.lims[1, 0], settings.lims[1, 1], settings.npoints[1], dtype=float)
+        X = np.linspace(
+            settings.lims[0, 0], settings.lims[0, 1], settings.npoints[0], dtype=float
+        )
+        Y = np.linspace(
+            settings.lims[1, 0], settings.lims[1, 1], settings.npoints[1], dtype=float
+        )
         energy = np.empty(shape=settings.npoints)
         c = np.empty(shape=settings.npoints)
         sum_c2 = np.empty(shape=settings.npoints)
@@ -239,6 +250,8 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         gradient_norm = np.empty(shape=settings.npoints)
         gradient_c = np.empty(shape=(*settings.npoints, surface.ndim))
         eigenvalues = np.empty(shape=(*settings.npoints, surface.ndim))
+
+        basin = np.empty(shape=(settings.npoints))
 
         grad_ext_dist1 = np.empty(shape=settings.npoints)
         grad_ext_dist2 = np.empty(shape=settings.npoints)
@@ -257,7 +270,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                 n = len(X) * len(Y)
                 print(f"Point {i} / {n} ( {i/n*100:.2f} %)", end="\r")
 
-                xy = np.array([x,y])
+                xy = np.array([x, y])
 
                 energy[yi, xi] = surface.energy(xy)
 
@@ -271,6 +284,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                     or settings.plot_grad_ext_dist1
                     or settings.plot_grad_ext_dist2
                     or settings.plot_grad_ext_crit
+                    or settings.plot_basin
                 ):
                     hessian = surface.hessian(xy)
                     eigenvals, eigenvecs = modes.eigenpairs(hessian)
@@ -280,6 +294,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                     eigenvalues[yi, xi] = eigenvals
 
                     G = surface.gradient(xy)
+                    gradient[yi, xi] = surface.gradient(xy)
 
                     mode[yi, xi] = eigenvecs[:, 0]
                     mode2[yi, xi] = eigenvecs[:, 1]
@@ -300,6 +315,17 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                     # grad_ext_dist2[yi, xi] = 1.0 - np.dot(mode2[yi, xi], G_norm)**2
 
                     Gfollower.compute_v(hessian, v_prev=mode[yi, xi])
+
+                    if (
+                        eigenvals[0] < 0
+                        and eigenvals[1] < 0
+                        or eigenvals[0] > 0
+                        and eigenvals[1] > 0
+                    ):
+                        basin[yi, xi] = 0.0
+                    else:
+                        basin[yi, xi] = 1.0
+
                     # (
                     #     _,
                     #     grad_ext_dist2[yi, xi],
@@ -372,6 +398,8 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
             grad_ext_dist2 = np.load(settings.input_data_folder / "grad_ext_dist2.npy")
         if (settings.input_data_folder / "grad_ext_crit.npy").exists():
             grad_ext_crit = np.load(settings.input_data_folder / "grad_ext_crit.npy")
+        if (settings.input_data_folder / "basin.npy").exists():
+            basin = np.load(settings.output_data_folder / "basin.npy", basin)
 
     if not settings.output_data_folder is None:
         np.save(settings.output_data_folder / "X", X)
@@ -390,8 +418,10 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
             or settings.plot_grad_ext_dist1
             or settings.plot_grad_ext_dist2
             or settings.plot_grad_ext_crit
+            or settings.plot_basin
         ):
             np.save(settings.output_data_folder / "eigenvalues", eigenvalues)
+            np.save(settings.output_data_folder / "basin", basin)
             np.save(settings.output_data_folder / "mode", mode)
             np.save(settings.output_data_folder / "mode2", mode2)
             np.save(settings.output_data_folder / "sum_c2", sum_c2)
@@ -467,6 +497,9 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
             ax, X, Y, 2 * c * gradient_c[:, :, 0], 2 * c * gradient_c[:, :, 1]
         )
 
+    if settings.plot_basin:
+        settings.plot_basin.plot(ax, X, Y, basin)
+
     for path_settings in settings.path_plots:
         path_settings.plot(ax)
 
@@ -480,9 +513,9 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
     else:
         ax.set_ylim(settings.lims[1])
 
-
     ax.set_xlabel("x")
     ax.set_ylabel("y")
+
     ax.legend()
 
     if not settings.outfile is None:
