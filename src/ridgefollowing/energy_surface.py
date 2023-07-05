@@ -5,7 +5,7 @@ import numdifftools as nd
 
 
 class EnergySurface(abc.ABC):
-    """Abstract base class for energy surfaces."""
+    """Abstract base class for energy surfaces. Any deriving class has to implement at least the energy function."""
 
     def __init__(self, ndim):
         self.ndim = ndim
