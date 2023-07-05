@@ -1,8 +1,7 @@
 from ridgefollowing import energy_surface
 import numpy as np
 import numpy.typing as npt
-from numba import jit
-from numba import float64, int32
+from numba import njit
 
 
 class GaussianSurface(energy_surface.EnergySurface):
@@ -35,7 +34,7 @@ class GaussianSurface(energy_surface.EnergySurface):
         assert self.widths.shape == (self.n_gaussians,)
 
     @staticmethod
-    @jit(nopython=True, cache=True)
+    @njit
     def energy_helper(x, n_gaussians, magnitudes, centers, widths, matrices):
         E = 0.0
         for igauss in range(n_gaussians):
@@ -57,7 +56,7 @@ class GaussianSurface(energy_surface.EnergySurface):
         )
 
     @staticmethod
-    @jit(nopython=True, cache=True)
+    @njit
     def gradient_helper(x, ndim, n_gaussians, magnitudes, centers, widths, matrices):
         grad = np.zeros(ndim)
 
@@ -84,7 +83,7 @@ class GaussianSurface(energy_surface.EnergySurface):
         )
 
     @staticmethod
-    @jit(nopython=True, cache=True)
+    @njit
     def hessian_helper(x, ndim, n_gaussians, magnitudes, centers, widths, matrices):
         hessian = np.zeros((ndim, ndim))
 
@@ -133,10 +132,10 @@ class GaussianSurface(energy_surface.EnergySurface):
             Mdir = np.matmul(self.matrices[igauss], dir_n)
             exponential = np.exp(w * np.dot(d, np.matmul(self.matrices[igauss], d)))
             curvature += (
-                2
+                2.0
                 * self.magnitudes[igauss]
                 * w
-                * (2 * w * exponential * np.dot(Mdir, d) * Md + exponential * Mdir)
+                * (2.0 * w * exponential * np.dot(Mdir, d) * Md + exponential * Mdir)
             )
 
         return curvature
