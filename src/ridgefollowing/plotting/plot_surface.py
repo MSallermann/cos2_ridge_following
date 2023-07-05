@@ -213,7 +213,9 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
     if ax is None:
         pplot = Paper_Plot(width=settings.width)
 
-        data_aspect_ratio = (settings.lims[0][1] - settings.lims[0][0]) / (settings.lims[1][1] - settings.lims[1][0])
+        data_aspect_ratio = (settings.lims[0][1] - settings.lims[0][0]) / (
+            settings.lims[1][1] - settings.lims[1][0]
+        )
         pplot.apply_absolute_margins(
             aspect_ratio=data_aspect_ratio,
             abs_horizontal_margins=settings.abs_horizontal_margins,
@@ -228,8 +230,12 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
     assert surface.ndim == 2
 
     if settings.input_data_folder is None:
-        X = np.linspace(settings.lims[0, 0], settings.lims[0, 1], settings.npoints[0], dtype=float)
-        Y = np.linspace(settings.lims[1, 0], settings.lims[1, 1], settings.npoints[1], dtype=float)
+        X = np.linspace(
+            settings.lims[0, 0], settings.lims[0, 1], settings.npoints[0], dtype=float
+        )
+        Y = np.linspace(
+            settings.lims[1, 0], settings.lims[1, 1], settings.npoints[1], dtype=float
+        )
         energy = np.empty(shape=settings.npoints)
         c = np.empty(shape=settings.npoints)
         sum_c2 = np.empty(shape=settings.npoints)
@@ -257,7 +263,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
                 n = len(X) * len(Y)
                 print(f"Point {i} / {n} ( {i/n*100:.2f} %)", end="\r")
 
-                xy = np.array([x,y])
+                xy = np.array([x, y])
 
                 energy[yi, xi] = surface.energy(xy)
 
@@ -479,7 +485,6 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         ax.set_ylim(settings.ylim)
     else:
         ax.set_ylim(settings.lims[1])
-
 
     ax.set_xlabel("x")
     ax.set_ylabel("y")
