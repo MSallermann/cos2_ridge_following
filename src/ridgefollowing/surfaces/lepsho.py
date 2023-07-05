@@ -10,7 +10,6 @@ class LepsHOSurface(leps.LepsSurface):
 
     def __init__(self):
         self.kc = 0.2025
-        # self.kc = 0.0
         self.c_ho = 1.154
         self.rAC = 3.742
         super().__init__()

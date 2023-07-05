@@ -5,6 +5,8 @@ import numdifftools as nd
 
 
 class EnergySurface(abc.ABC):
+    """Abstract base class for energy surfaces."""
+
     def __init__(self, ndim):
         self.ndim = ndim
 
@@ -34,7 +36,7 @@ class EnergySurface(abc.ABC):
         return self.fd_gradient(x)
 
     def directional_gradient(self, x: npt.NDArray, dir: npt.NDArray) -> npt.NDArray:
-        """Directional derivative.
+        """Directional derivative
 
         Args:
             x (npt.NDArray): the point on the energy surface

@@ -56,15 +56,15 @@ class LepsSurfaceHelper:
         self.diff2_J_vec = diff2_J_vec
         self.ndim = ndim
 
-    def Q(self, r: float, d: float):
+    def Q(self, r: float, d: float) -> float:
         """Q helper function
 
         Args:
-            r (_type_): _description_
-            d (_type_): _description_
+            r (float)
+            d (float)
 
         Returns:
-            _type_: _description_
+            float
         """
 
         return (
@@ -76,15 +76,15 @@ class LepsSurfaceHelper:
             )
         )
 
-    def J(self, r: float, d: float):
+    def J(self, r: float, d: float) -> float:
         """J helper function
 
         Args:
-            r (_type_): _description_
-            d (_type_): _description_
+            r (float)
+            d (float)
 
         Returns:
-            _type_: _description_
+            float
         """
         return (
             0.25
@@ -95,15 +95,15 @@ class LepsSurfaceHelper:
             )
         )
 
-    def diff_Q(self, r: float, d: float):
+    def diff_Q(self, r: float, d: float) -> float:
         """derivative of Q helper function wrt r
 
         Args:
-            r (_type_): _description_
-            d (_type_): _description_
+            r (float)
+            d (float)
 
         Returns:
-            _type_: _description_
+            float
         """
         return (
             0.5
@@ -114,15 +114,15 @@ class LepsSurfaceHelper:
             )
         )
 
-    def diff_J(self, r: float, d: float):
+    def diff_J(self, r: float, d: float) -> float:
         """derivative of J helper function wrt r
 
         Args:
-            r (_type_): _description_
-            d (_type_): _description_
+            r (float)
+            d (float)
 
         Returns:
-            _type_: _description_
+            float
         """
         return (
             0.25
@@ -137,11 +137,11 @@ class LepsSurfaceHelper:
         """second derivative of Q helper function wrt r
 
         Args:
-            r (_type_): _description_
-            d (_type_): _description_
+            r (float)
+            d (float)
 
         Returns:
-            _type_: _description_
+            float
         """
         return (
             0.5
@@ -156,11 +156,11 @@ class LepsSurfaceHelper:
         """second derivative of J helper function wrt r
 
         Args:
-            r (_type_): _description_
-            d (_type_): _description_
+            r (float)
+            d (float)
 
         Returns:
-            _type_: _description_
+            float
         """
         return (
             0.25
@@ -173,7 +173,7 @@ class LepsSurfaceHelper:
 
 
 class LepsSurface(energy_surface.EnergySurface):
-    """The LEPS surface. See G. Henkelman, G. J ́ohannesson, H. J ́onsson. Methods for Finding Saddle Points and Mini- mum Energy Paths, In ”Theoretical Methods in Condensed Phase Chemistry”, edited by S.D. Schwartz, pages 269-30"""
+    """The LEPS surface. See G. Henkelman, G. J ́ohannesson, H. J onsson. Methods for Finding Saddle Points and Mini- mum Energy Paths, In ”Theoretical Methods in Condensed Phase Chemistry”, edited by S.D. Schwartz, pages 269-30"""
 
     def __init__(
         self,
@@ -213,57 +213,18 @@ class LepsSurface(energy_surface.EnergySurface):
             ndim=self.ndim,
         )
 
-    def Q(self, r: float, d: float):
-        """Q helper function
-
-        Args:
-            r (_type_): _description_
-            d (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
-
-        return (
-            0.5
-            * d
-            * (
-                1.5 * np.exp(-2.0 * self.alpha * (r - self.r0))
-                - np.exp(-self.alpha * (r - self.r0))
-            )
-        )
-
-    def J(self, r: float, d: float):
-        """J helper function
-
-        Args:
-            r (_type_): _description_
-            d (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
-        return (
-            0.25
-            * d
-            * (
-                np.exp(-2.0 * self.alpha * (r - self.r0))
-                - 6.0 * np.exp(-self.alpha * (r - self.r0))
-            )
-        )
-
     @staticmethod
     @njit()
-    def V_LEPS(rAB, rBC, rAC, params):
-        """The leps potential function
+    def V_LEPS(rAB: float, rBC: float, rAC: float, params: LepsSurfaceHelper) -> float:
+        """The LEPS potential function
 
         Args:
-            rAB (_type_): _description_
-            rBC (_type_): _description_
-            rAC (_type_): _description_
+            rAB (float)
+            rBC (float)
+            rAC (float)
 
         Returns:
-            _type_: _description_
+            float
         """
         Q_contribution = (
             params.Q(rAB, params.dAB) / (1.0 + params.a)
@@ -285,56 +246,20 @@ class LepsSurface(energy_surface.EnergySurface):
         rBC = x[1]
         return LepsSurface.V_LEPS(rAB, rBC, self.rAC, self.helper)
 
-    def diff_Q(self, r: float, d: float):
-        """derivative of Q helper function wrt r
-
-        Args:
-            r (_type_): _description_
-            d (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
-        return (
-            0.5
-            * d
-            * (
-                -3.0 * self.alpha * np.exp(-2.0 * self.alpha * (r - self.r0))
-                + self.alpha * np.exp(-self.alpha * (r - self.r0))
-            )
-        )
-
-    def diff_J(self, r: float, d: float):
-        """derivative of J helper function wrt r
-
-        Args:
-            r (_type_): _description_
-            d (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
-        return (
-            0.25
-            * d
-            * (
-                -2.0 * self.alpha * np.exp(-2.0 * self.alpha * (r - self.r0))
-                + 6.0 * self.alpha * np.exp(-self.alpha * (r - self.r0))
-            )
-        )
-
     @staticmethod
     @njit
-    def gradient_V_LEPS(rAB, rBC, rAC, params):
+    def gradient_V_LEPS(
+        rAB: float, rBC: float, rAC: float, params: LepsSurfaceHelper
+    ) -> npt.NDArray:
         """Grad of the leps potential function
 
         Args:
-            rAB (_type_): _description_
-            rBC (_type_): _description_
-            rAC (_type_): _description_
+            rAB (float)
+            rBC (float)
+            rAC (float)
 
         Returns:
-            _type_: _description_
+            NDArray
         """
         grad = np.zeros(3)
         grad[0] = params.diff_Q(rAB, params.dAB) / (1.0 + params.a)
@@ -372,56 +297,20 @@ class LepsSurface(energy_surface.EnergySurface):
         rBC = x[1]
         return LepsSurface.gradient_V_LEPS(rAB, rBC, self.rAC, self.helper)[:2]
 
-    def diff2_Q(self, r: float, d: float):
-        """second derivative of Q helper function wrt r
-
-        Args:
-            r (_type_): _description_
-            d (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
-        return (
-            0.5
-            * d
-            * (
-                6.0 * self.alpha**2 * np.exp(-2.0 * self.alpha * (r - self.r0))
-                - self.alpha**2 * np.exp(-self.alpha * (r - self.r0))
-            )
-        )
-
-    def diff2_J(self, r: float, d: float):
-        """second derivative of J helper function wrt r
-
-        Args:
-            r (_type_): _description_
-            d (_type_): _description_
-
-        Returns:
-            _type_: _description_
-        """
-        return (
-            0.25
-            * d
-            * (
-                4.0 * self.alpha**2 * np.exp(-2.0 * self.alpha * (r - self.r0))
-                - 6.0 * self.alpha**2 * np.exp(-self.alpha * (r - self.r0))
-            )
-        )
-
     @staticmethod
     @njit
-    def hessian_V_LEPS(rAB, rBC, rAC, params) -> npt.NDArray:
+    def hessian_V_LEPS(
+        rAB: float, rBC: float, rAC: float, params: LepsSurfaceHelper
+    ) -> npt.NDArray:
         """Hessian of the leps potential function
 
         Args:
-            rAB (_type_): _description_
-            rBC (_type_): _description_
-            rAC (_type_): _description_
+            rAB (float)
+            rBC (float)
+            rAC (float)
 
         Returns:
-            _type_: _description_
+            NDArray
         """
 
         hessian_q = np.zeros((3, 3))
