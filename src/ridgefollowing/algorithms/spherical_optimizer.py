@@ -2,7 +2,6 @@ from ridgefollowing.algorithms import ncg
 from scipy.optimize import minimize
 import numpy as np
 import numpy.typing as npt
-from numdifftools import Gradient
 from typing import Optional
 from pydantic import BaseModel
 from numba import njit
@@ -39,15 +38,15 @@ class SphericalOptimization:
         self.grad = grad
         self.tolerance: float = tolerance
         self.maxiter = maxiter
-        self.x_embed = np.zeros(ndim)
-        self.x_stereo = np.zeros(ndim - 1)
         self.pole: float = 1.0
         self.disp: bool = disp
         self.assert_success: bool = assert_success
 
+        self.pole_switch_tolerance: float = 0.5
+
     def switch_pole_if_necessary(self, x_embed):
-        if np.abs(1.0 - self.pole * x_embed[-1]) < 1.0:
-            self.pole *= -1
+        if np.abs(1.0 - self.pole * x_embed[-1]) < self.pole_switch_tolerance:
+            self.pole *= -1.0
             return True
         else:
             return False
@@ -88,7 +87,7 @@ class SphericalOptimization:
         grad_stereo = (1.0 - pole * x_embed[-1]) * grad_embed[:-1]
         grad_stereo += (
             pole
-            * 4
+            * 4.0
             / (s**2 + 1.0) ** 2
             * x_stereo
             * (grad_embed[-1] - pole * np.dot(grad_embed[:-1], x_stereo))
@@ -126,7 +125,12 @@ class SphericalOptimization:
         )
 
         if self.assert_success:
-            assert res.success
+            if not res.success:
+                print(f"gradient = {res.jac}")
+                print(
+                    f"max component. = {np.max( np.abs(res.jac) )} > {self.tolerance}"
+                )
+                raise Exception("Optimization unsuccessful")
 
         return SphericalOptimization.Result(
             x_opt=np.array(SphericalOptimization.stereo_to_embed(res.x, self.pole)),
