@@ -55,7 +55,7 @@ class RidgeFollower(abc.ABC):
             raise Exception("Output path needs to be set")
 
         folder = self.output_path / "history"
-        folder.mkdir(exist_ok=True)
+        folder.mkdir(exist_ok=True, parents=True)
 
         for k, v in self.history.items():
             np.save(folder / k, v)
@@ -67,7 +67,7 @@ class RidgeFollower(abc.ABC):
             raise Exception("Output path needs to be set")
 
         folder = self.output_path / "plot_history"
-        folder.mkdir(exist_ok=True)
+        folder.mkdir(exist_ok=True, parents=True)
 
         for k, v in self.history.items():
             if len(v.shape) == 1:
@@ -112,8 +112,9 @@ class RidgeFollower(abc.ABC):
 
             if self.print_progress:
                 prog = (i + 1) / self.n_iterations_follow * 100
+                dt = self.measure_iteration_time()
                 print(
-                    f"Iteration {i} / {self.n_iterations_follow} ( {prog:.3f}% ) ... Delta t = {self.measure_iteration_time():.4f} s",
+                    f"Iteration {i} / {self.n_iterations_follow} ( {prog:.3f}% ) ... Delta t = {dt:.4f} s, IPS = {1.0/dt:.4f}",
                     end="\n",
                 )
 
@@ -134,6 +135,6 @@ class RidgeFollower(abc.ABC):
         if self.print_progress:
             print(30 * "-")
             print(
-                f"Run ended: time = {self.t_end - self.t_start:.2f} s, iterations = {self._iteration}, IPS = {self._iteration / (self.t_end - self.t_start):.2f}"
+                f"Run ended: time = {self.t_end - self.t_start:.2f}s, iterations = {self._iteration}, IPS = {self._iteration / (self.t_end - self.t_start):.2f}"
             )
             print(30 * "=")
