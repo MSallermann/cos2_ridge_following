@@ -20,6 +20,7 @@ class PathPlotSettings(BaseModel):
     ls: str = "-"
     color: str = "black"
     marker: Optional[str] = None
+    markersize: float = 10
     mec: Optional[str] = None
     zorder: Optional[int] = 1
 
@@ -37,6 +38,7 @@ class PathPlotSettings(BaseModel):
             color=self.color,
             mec=self.mec,
             marker=self.marker,
+            markersize=self.markersize,
             zorder=self.zorder,
             **self.kwargs,
         )
@@ -64,6 +66,8 @@ class ScalarPlotSettings(BaseModel):
     vmax: Optional[float] = None
     vmin: Optional[float] = None
     extend: Optional[str] = None
+
+    linewidths: float = 1.0
 
     alpha: float = 1.0
 
@@ -103,6 +107,7 @@ class ScalarPlotSettings(BaseModel):
                     linestyles=self.linestyles,
                     zorder=self.zorder,
                     alpha=self.alpha,
+                    linewidths=self.linewidths,
                 )
             )
         return return_vals
@@ -168,6 +173,8 @@ class PlotSettings(BaseModel):
     )
     dpi: float = 300
 
+    aspect_ratio: Optional[float] = None
+
     lims: npt.NDArray = np.array([[0, 1], [0, 1]])  # limits [[xmin, xmax], [ymin, ymax]
     npoints: npt.NDArray = np.array(
         [100, 100], dtype=np.int64
@@ -218,11 +225,14 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
     if ax is None:
         pplot = Paper_Plot(width=settings.width)
 
-        data_aspect_ratio = (settings.lims[0][1] - settings.lims[0][0]) / (
-            settings.lims[1][1] - settings.lims[1][0]
-        )
+        if settings.aspect_ratio is None:
+            data_aspect_ratio = (settings.lims[0][1] - settings.lims[0][0]) / (
+                settings.lims[1][1] - settings.lims[1][0]
+            )
+            settings.aspect_ratio = data_aspect_ratio
+
         pplot.apply_absolute_margins(
-            aspect_ratio=data_aspect_ratio,
+            aspect_ratio=settings.aspect_ratio,
             abs_horizontal_margins=settings.abs_horizontal_margins,
             abs_vertical_margins=settings.abs_vertical_margins,
         )
