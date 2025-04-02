@@ -1,4 +1,4 @@
-from ridgefollowing.surfaces import quadratic
+from energy_surfaces.surfaces import quadratic
 from ridgefollowing.plotting import plot_surface
 import numpy as np
 

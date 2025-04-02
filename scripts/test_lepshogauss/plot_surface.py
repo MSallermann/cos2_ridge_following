@@ -1,4 +1,4 @@
-from ridgefollowing.surfaces import lepshogauss
+from energy_surfaces.surfaces import lepshogauss
 from spirit_extras.calculation_folder import Calculation_Folder
 from ridgefollowing.plotting import plot_surface
 from pathlib import Path

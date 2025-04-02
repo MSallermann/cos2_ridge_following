@@ -1,4 +1,4 @@
-from ridgefollowing.surfaces import cubic
+from energy_surfaces.surfaces import cubic
 from ridgefollowing.algorithms import gradient_extremal_follower
 from ridgefollowing.plotting import plot_surface
 import numpy as np

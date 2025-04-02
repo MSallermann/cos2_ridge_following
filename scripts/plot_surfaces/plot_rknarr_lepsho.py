@@ -2,7 +2,7 @@ from rKNARR.potentials.lepsho import LEPSHO, LEPSHOGAUSS
 from rKNARR.atoms import Atoms
 from ridgefollowing.plotting import plot_surface
 from ridgefollowing.algorithms import minimizer, ridgefollower
-from ridgefollowing import energy_surface
+from energy_surfaces import energy_surface
 import numpy.typing as npt
 import numpy as np
 

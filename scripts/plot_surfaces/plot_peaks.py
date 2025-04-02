@@ -1,4 +1,4 @@
-from ridgefollowing.surfaces import peaks
+from energy_surfaces.surfaces import peaks
 from ridgefollowing.plotting import plot_surface
 import numpy as np
 

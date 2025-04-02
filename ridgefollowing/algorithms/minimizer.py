@@ -1,4 +1,4 @@
-from ridgefollowing import energy_surface
+from energy_surfaces import energy_surface
 from ridgefollowing.algorithms import modes
 import numpy.typing as npt
 import numpy as np

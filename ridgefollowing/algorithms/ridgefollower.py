@@ -1,5 +1,5 @@
 import abc
-from ridgefollowing import energy_surface
+from energy_surfaces import energy_surface
 from typing import Optional
 import numpy.typing as npt
 import numpy as np

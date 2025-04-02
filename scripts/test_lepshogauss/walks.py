@@ -1,4 +1,4 @@
-from ridgefollowing.surfaces import lepshogauss
+from energy_surfaces.surfaces import lepshogauss
 from ridgefollowing.algorithms import minimizer, cosine_follower
 from pathlib import Path
 import matplotlib.pyplot as plt

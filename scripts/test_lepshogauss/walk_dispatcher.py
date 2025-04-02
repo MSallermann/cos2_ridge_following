@@ -8,7 +8,7 @@ import numpy as np
 import enum
 import matplotlib.pyplot as plt
 
-from ridgefollowing.surfaces import lepshogauss
+from energy_surfaces.surfaces import lepshogauss
 from ridgefollowing.algorithms import cosine_follower, gradient_extremal_follower
 
 

@@ -1,4 +1,4 @@
-from ridgefollowing.surfaces import lepshogauss, quadratic
+from energy_surfaces.surfaces import lepshogauss, quadratic
 from ridgefollowing.algorithms import minimizer, cosine_follower
 import numpy as np
 import matplotlib.pyplot as plt

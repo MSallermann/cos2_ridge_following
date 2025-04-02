@@ -1,4 +1,4 @@
-from ridgefollowing import energy_surface
+from energy_surfaces import energy_surface
 from ridgefollowing.algorithms import modes, cosine_follower, gradient_extremal_follower
 
 # from ridgefollowing import ridgefollower

@@ -1,6 +1,6 @@
 import timeit
 import numpy as np
-from ridgefollowing.surfaces import (
+from energy_surfaces.surfaces import (
     muller_brown,
     leps,
     lepsho,
