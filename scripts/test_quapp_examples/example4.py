@@ -1,8 +1,7 @@
-from ridgefollowing.surfaces import cubic
+from energy_surfaces.surfaces import cubic
 from ridgefollowing.algorithms import gradient_extremal_follower, cosine_follower, modes
 from ridgefollowing.plotting import plot_surface
 import numpy as np
-from pathlib import Path
 
 settings = plot_surface.PlotSettings(
     width=10 * plot_surface.cm,
@@ -139,7 +138,7 @@ for f in [follower_cos]:
 
 
 for i, t in enumerate(follower_trajectories):
-    color = f"C{i+1}"
+    color = f"C{i + 1}"
     settings.path_plots.append(
         plot_surface.PathPlotSettings(points=t, color=color, marker=".", zorder=11)
     )

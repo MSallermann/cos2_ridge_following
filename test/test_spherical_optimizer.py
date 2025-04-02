@@ -1,5 +1,5 @@
 from ridgefollowing.algorithms import spherical_optimizer, cosine_follower
-from ridgefollowing.surfaces import gaussians, lepshogauss
+from energy_surfaces.surfaces import gaussians, lepshogauss
 
 import numpy as np
 from numdifftools import Gradient

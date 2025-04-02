@@ -6,11 +6,6 @@ dependencies = [
     "numpy",
     "numdifftools",
     "numba",
-    "pydantic<2.0"
+    "pydantic<2.0",
+    "energy_surfaces@git+https://github.com/msallermann/energy_surfaces.git@v0.1.0"
 ]
-
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["ridgefollowing*", "ridgefollowing.*"]  # ["*"] by default
-exclude = ["ridgefollowing.tests*"]  # empty by default
-namespaces = false  # true by default

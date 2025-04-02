@@ -1,12 +1,11 @@
-from ridgefollowing import energy_surface
+from energy_surfaces import energy_surface
 from ridgefollowing.algorithms import ridgefollower, modes, spherical_optimizer
 import numpy.typing as npt
-from typing import Optional, List, Union
+from typing import Optional, List
 from pathlib import Path
 import numpy as np
 from scipy.optimize import minimize
 import numdifftools as nd
-from numba import njit
 
 
 class CosineFollower(ridgefollower.RidgeFollower):
@@ -74,7 +73,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
         grad /= np.linalg.norm(grad)
         evals, evecs = modes.lowest_n_modes(self.esurf.hessian(x), self.n_modes)
 
-        if not output_evals is None:
+        if output_evals is not None:
             output_evals[:] = evals
 
         return np.dot(grad, evecs[:, 0])
@@ -466,11 +465,11 @@ class CosineFollower(ridgefollower.RidgeFollower):
                     normal=search_direction,
                     max_dist=10 * self.radius * f,
                 )
-                l = self.get_dir_with_max_verlap(
+                search_direction = self.get_dir_with_max_verlap(
                     v0=search_direction, s=self.grad_C2_mod(x0 + delta_x)
                 )
                 success = self.feel_out_ridge(
-                    x0 + delta_x, search_direction=l, n_factors=n_factors
+                    x0 + delta_x, search_direction=search_direction, n_factors=n_factors
                 )
                 if success:
                     break
@@ -543,7 +542,7 @@ class CosineFollower(ridgefollower.RidgeFollower):
                 or main_ridge_to_side_ridge
                 or side_ridge_to_main_ridge
             ):
-                print(f"Potential bifurcation at iteration {self._iteration-1}")
+                print(f"Potential bifurcation at iteration {self._iteration - 1}")
                 x_bif = self.history["x_cur"][self._iteration - 1]
 
                 if angle_criterion:

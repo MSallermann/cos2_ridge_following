@@ -1,6 +1,5 @@
 import numpy.typing as npt
 import numpy as np
-import numdifftools as nd
 from pydantic import BaseModel
 from typing import Optional
 

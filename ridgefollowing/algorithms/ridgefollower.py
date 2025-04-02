@@ -1,5 +1,5 @@
 import abc
-from ridgefollowing import energy_surface
+from energy_surfaces import energy_surface
 from typing import Optional
 import numpy.typing as npt
 import numpy as np
@@ -85,8 +85,7 @@ class RidgeFollower(abc.ABC):
             self.history[k] = self.history[k][: self._iteration + 1]
 
     @abc.abstractmethod
-    def determine_step(self):
-        ...
+    def determine_step(self): ...
 
     def measure_iteration_time(self):
         self.t_cur_prev = self.t_cur
@@ -114,7 +113,7 @@ class RidgeFollower(abc.ABC):
                 prog = (i + 1) / self.n_iterations_follow * 100
                 dt = self.measure_iteration_time()
                 print(
-                    f"Iteration {i} / {self.n_iterations_follow} ( {prog:.3f}% ) ... Delta t = {dt:.4f} s, IPS = {1.0/dt:.4f}",
+                    f"Iteration {i} / {self.n_iterations_follow} ( {prog:.3f}% ) ... Delta t = {dt:.4f} s, IPS = {1.0 / dt:.4f}",
                     end="\n",
                 )
 

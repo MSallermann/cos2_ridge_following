@@ -1,5 +1,4 @@
 from pydantic import BaseModel, validator
-from typing import List, Optional
 from pathlib import Path
 import numpy.typing as npt
 from spirit_extras import calculation_folder
@@ -8,7 +7,7 @@ import numpy as np
 import enum
 import matplotlib.pyplot as plt
 
-from ridgefollowing.surfaces import lepshogauss
+from energy_surfaces.surfaces import lepshogauss
 from ridgefollowing.algorithms import cosine_follower, gradient_extremal_follower
 
 

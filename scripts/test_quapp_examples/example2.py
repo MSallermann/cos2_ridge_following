@@ -1,8 +1,7 @@
-from ridgefollowing.surfaces import cubic
+from energy_surfaces.surfaces import cubic
 from ridgefollowing.algorithms import gradient_extremal_follower, cosine_follower
 from ridgefollowing.plotting import plot_surface
 import numpy as np
-from pathlib import Path
 
 settings = plot_surface.PlotSettings(
     width=10 * plot_surface.cm,

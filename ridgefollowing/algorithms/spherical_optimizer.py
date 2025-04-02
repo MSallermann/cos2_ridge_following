@@ -1,4 +1,3 @@
-from ridgefollowing.algorithms import ncg
 from scipy.optimize import minimize
 import numpy as np
 import numpy.typing as npt
@@ -127,9 +126,7 @@ class SphericalOptimization:
         if self.assert_success:
             if not res.success:
                 print(f"gradient = {res.jac}")
-                print(
-                    f"max component. = {np.max( np.abs(res.jac) )} > {self.tolerance}"
-                )
+                print(f"max component. = {np.max(np.abs(res.jac))} > {self.tolerance}")
                 raise Exception("Optimization unsuccessful")
 
         return SphericalOptimization.Result(

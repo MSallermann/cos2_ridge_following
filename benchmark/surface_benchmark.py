@@ -1,6 +1,6 @@
 import timeit
 import numpy as np
-from ridgefollowing.surfaces import (
+from energy_surfaces.surfaces import (
     muller_brown,
     leps,
     lepsho,
@@ -10,10 +10,9 @@ from ridgefollowing.surfaces import (
 
 
 def benchmark(fun, number=10000, x=np.array([1.0, 1.0]), prints=True):
-    tmp = fun(x)
     time = timeit.timeit(lambda: fun(x), number=number) / number
     if prints:
-        print(f"Time per function call: {time*1e6:.1f} us")
+        print(f"Time per function call: {time * 1e6:.1f} us")
     return time
 
 
