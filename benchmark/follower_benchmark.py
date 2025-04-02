@@ -1,4 +1,3 @@
-import timeit
 import numpy as np
 from energy_surfaces.surfaces import muller_brown
 from ridgefollowing.algorithms import cosine_follower

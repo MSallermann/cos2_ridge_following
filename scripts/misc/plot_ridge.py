@@ -1,9 +1,7 @@
-from energy_surfaces.surfaces import muller_brown, quadratic
+from energy_surfaces.surfaces import muller_brown
 from ridgefollowing.plotting import plot_surface
 from ridgefollowing.algorithms import minimizer, ridgefollower
 import numpy as np
-import pandas as pd
-from pandas import DataFrame
 import matplotlib
 
 gui_env = ["Qt5Agg"]

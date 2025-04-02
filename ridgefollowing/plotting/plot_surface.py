@@ -270,7 +270,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         Rfollower = cosine_follower.CosineFollower(surface)
         Gfollower = gradient_extremal_follower.GradientExtremalFollower(surface)
 
-        if not settings.output_data_folder is None:
+        if settings.output_data_folder is not None:
             # assert settings.output_data_folder.is_dir()
             settings.output_data_folder.mkdir(parents=True, exist_ok=True)
 
@@ -278,7 +278,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
             for yi, y in enumerate(Y):
                 i = xi * len(Y) + yi
                 n = len(X) * len(Y)
-                print(f"Point {i} / {n} ( {i/n*100:.2f} %)", end="\r")
+                print(f"Point {i} / {n} ( {i / n * 100:.2f} %)", end="\r")
 
                 xy = np.array([x, y])
 
@@ -411,7 +411,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
         if (settings.input_data_folder / "basin.npy").exists():
             basin = np.load(settings.output_data_folder / "basin.npy", basin)
 
-    if not settings.output_data_folder is None:
+    if settings.output_data_folder is not None:
         np.save(settings.output_data_folder / "X", X)
         np.save(settings.output_data_folder / "Y", Y)
 
@@ -494,7 +494,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
     if settings.plot_mode2:
         settings.plot_mode2.plot(ax, X, Y, mode2[:, :, 0], mode2[:, :, 1])
 
-    if not settings.plot_gradient is None:
+    if settings.plot_gradient is not None:
         settings.plot_gradient.plot(ax, X, Y, gradient[:, :, 0], gradient[:, :, 1])
 
     if settings.plot_gradient_c:
@@ -513,12 +513,12 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
     for path_settings in settings.path_plots:
         path_settings.plot(ax)
 
-    if not settings.xlim is None:
+    if settings.xlim is not None:
         ax.set_xlim(settings.xlim)
     else:
         ax.set_xlim(settings.lims[0])
 
-    if not settings.ylim is None:
+    if settings.ylim is not None:
         ax.set_ylim(settings.ylim)
     else:
         ax.set_ylim(settings.lims[1])
@@ -528,7 +528,7 @@ def plot(surface: energy_surface.EnergySurface, ax=None, settings=PlotSettings()
 
     ax.legend()
 
-    if not settings.outfile is None:
+    if settings.outfile is not None:
         fig.savefig(settings.outfile, dpi=settings.dpi)
 
     if settings.show:

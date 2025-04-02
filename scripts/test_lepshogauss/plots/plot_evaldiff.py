@@ -2,7 +2,6 @@ from energy_surfaces.surfaces import lepshogauss
 from ridgefollowing.plotting import plot_surface
 from pathlib import Path
 import numpy as np
-from ridgefollowing.algorithms import minimizer
 
 esurf = lepshogauss.LepsHOGaussSurface()
 

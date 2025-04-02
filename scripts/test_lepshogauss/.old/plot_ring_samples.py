@@ -1,5 +1,5 @@
-from energy_surfaces.surfaces import lepshogauss, quadratic
-from ridgefollowing.algorithms import minimizer, ridgefollower
+from energy_surfaces.surfaces import lepshogauss
+from ridgefollowing.algorithms import ridgefollower
 import numpy as np
 import matplotlib.pyplot as plt
 

@@ -4,6 +4,8 @@ from ridgefollowing.plotting import plot_surface
 from pathlib import Path
 from typing import List, Optional
 import numpy as np
+import matplotlib.patheffects as pe
+
 
 esurf = lepshogauss.LepsHOGaussSurface()
 
@@ -35,9 +37,6 @@ settings = plot_surface.PlotSettings(
         contours_filled=True,
     ),
 )
-
-import matplotlib.patheffects as pe
-
 
 def plot_walks(output_dir: Path, color, label: bool):
     trajectory = np.load(output_dir / "x_cur.npy")
@@ -72,7 +71,7 @@ def main(
     regenerate_data: bool,
     label_points: bool = False,
 ):
-    if not data_folder is None:
+    if data_folder is not None:
         f = Calculation_Folder(data_folder, descriptor_file="meta.toml")
         print("===============")
         print(f.info_string())

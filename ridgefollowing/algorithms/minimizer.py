@@ -1,8 +1,5 @@
 from energy_surfaces import energy_surface
-from ridgefollowing.algorithms import modes
 import numpy.typing as npt
-import numpy as np
-import numdifftools as nd
 from scipy.optimize import minimize
 from typing import Optional, List
 

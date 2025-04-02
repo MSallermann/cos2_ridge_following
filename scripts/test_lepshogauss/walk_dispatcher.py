@@ -1,5 +1,4 @@
 from pydantic import BaseModel, validator
-from typing import List, Optional
 from pathlib import Path
 import numpy.typing as npt
 from spirit_extras import calculation_folder

@@ -1,4 +1,4 @@
-from energy_surfaces.surfaces import leps, lepsho
+from energy_surfaces.surfaces import lepsho
 from ridgefollowing.plotting import plot_surface
 import numpy as np
 
